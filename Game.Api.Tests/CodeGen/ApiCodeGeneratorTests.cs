@@ -110,6 +110,10 @@ namespace Game.Api.Tests.CodeGen
         [Fact]
         public void GetClientMirroredConstantFields_OrderIsUnaffectedByHostCulture()
         {
+            // Insurance for future names rather than a pin on current behaviour: this reflects the real
+            // Game.Core assembly, and no [ClientMirrored] name today collates differently between the two
+            // cultures, so it passes either way. GetClientMirroredConstantFields_IsOrderedDeterministically
+            // above is the case that actually states the ordinal contract.
             var invariantOrder = ApiCodeGenerator.GetClientMirroredConstantFields().Select(field => field.Name).ToList();
 
             using var culture = new CultureScope("tr-TR");
