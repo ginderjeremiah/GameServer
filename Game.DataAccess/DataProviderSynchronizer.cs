@@ -149,6 +149,22 @@ namespace Game.DataAccess
         // _infrastructureOutageLogged.
         private int _consecutiveOutageSuccesses;
 
+        // Write targets the watermark guard skipped as already superseded during the current drain pass, and
+        // how many events at least one of those rejections came from (#2474). A rejected write is legitimate,
+        // acknowledged work — but this path's whole purpose is never to silently drop a write, so a genuine
+        // reordering storm (or a bug in the sequencing itself) has to be visible rather than invisible.
+        // Reset at the start of each pass and summarized once at its end. Accessed via Interlocked since items
+        // apply concurrently across distinct players within one pass (#1701).
+        private int _passRejectedTargets;
+        private int _passRejectedEvents;
+
+        // Whether the pass-end rejection summary has already been logged at Warning. Rejections cluster: the
+        // interleaving that produces one typically produces a run of them across consecutive passes, so only
+        // the first pass of a run logs at Warning and the rest log at Debug, cleared by the first pass that
+        // rejects nothing. Same throttling shape as _infrastructureOutageLogged, and likewise touched only
+        // under the serialized drain, so it needs no lock.
+        private bool _rejectionsReported;
+
         public DataProviderSynchronizer(
             IServiceProvider services,
             IPubSubService pubsub,
@@ -387,6 +403,10 @@ namespace Game.DataAccess
             var inFlight = new List<Task>();
             using var concurrencyGate = new SemaphoreSlim(_maxConcurrentDrainItems);
 
+            // Rejections are totalled per pass and summarized once at its end rather than logged per event.
+            Interlocked.Exchange(ref _passRejectedTargets, 0);
+            Interlocked.Exchange(ref _passRejectedEvents, 0);
+
             // Players this pass has already reported a deferral for, so a blocked player's backlog logs once
             // rather than once per item. Pass-scoped: a still-blocked player is worth one line per pass.
             var deferredPlayers = new HashSet<int>();
@@ -504,6 +524,8 @@ namespace Game.DataAccess
             {
                 await SurfaceDeadLetterDepth(deadLetterQueue);
             }
+
+            SurfaceStaleWriteRejections();
         }
 
         /// <summary>
@@ -693,6 +715,34 @@ namespace Game.DataAccess
         }
 
         /// <summary>
+        /// Reports the write targets the watermark guard skipped this pass as already superseded (#2474). Each
+        /// one is legitimate — the event carries an older sequence than the target already holds, so it is
+        /// acknowledged as a successful no-op — but a path whose whole contract is "never silently drop a
+        /// write" must not drop them invisibly: a reordering storm, or a bug in the sequencing itself, would
+        /// otherwise look exactly like a healthy drain. One summary line per pass, and only the first pass of
+        /// a run logs at Warning (see <see cref="_rejectionsReported"/>).
+        /// </summary>
+        private void SurfaceStaleWriteRejections()
+        {
+            var targets = Volatile.Read(ref _passRejectedTargets);
+            if (targets == 0)
+            {
+                _rejectionsReported = false;
+                return;
+            }
+
+            var events = Volatile.Read(ref _passRejectedEvents);
+            if (_rejectionsReported)
+            {
+                _logger.LogDebug("Skipped {TargetCount} stale write target(s) across {EventCount} player data event(s) from queue '{Queue}' during this drain pass; each carried an older write sequence than the target already holds.", targets, events, Constants.PUBSUB_PLAYER_QUEUE);
+                return;
+            }
+
+            _rejectionsReported = true;
+            _logger.LogWarning("Skipped {TargetCount} stale write target(s) across {EventCount} player data event(s) from queue '{Queue}' during this drain pass; each carried an older write sequence than the target already holds.", targets, events, Constants.PUBSUB_PLAYER_QUEUE);
+        }
+
+        /// <summary>
         /// Processes a single queued message. <paramref name="envelope"/>/<paramref name="parseError"/> are the
         /// result of <see cref="DrainQueueAsync"/>'s single upfront <see cref="PlayerUpdateEnvelopeReader"/>
         /// parse (reused here rather than re-deserializing <paramref name="message"/>) — <paramref name="message"/>
@@ -829,6 +879,15 @@ namespace Game.DataAccess
             using var scope = _services.CreateScope();
             var dispatcher = new PlayerUpdateEventDispatcher(scope.ServiceProvider);
             await dispatcher.DispatchAsync(envelope);
+
+            // Read once the apply has durably committed, so a rejection this event's handler recorded and then
+            // rolled back is never counted. The scope's context described exactly this envelope.
+            var rejected = scope.ServiceProvider.GetRequiredService<PlayerUpdateContext>().RejectedTargetCount;
+            if (rejected > 0)
+            {
+                Interlocked.Add(ref _passRejectedTargets, rejected);
+                Interlocked.Increment(ref _passRejectedEvents);
+            }
         }
 
         public void Dispose()

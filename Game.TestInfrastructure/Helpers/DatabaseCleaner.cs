@@ -20,6 +20,10 @@ namespace Game.TestInfrastructure.Helpers
                     "PlayerChallenges",
                     "PlayerLessons",
                     "PlayerStatistics",
+                    -- Deliberately carries no FK to Players (it is drain metadata that outlives the rows it
+                    -- guards), so nothing cascades into it; listed explicitly, since RESTART IDENTITY reuses
+                    -- player ids and a leaked watermark would reject the next test's writes as stale.
+                    "PlayerWriteWatermarks",
                     "LogPreferences",
                     "UserLogins",
                     "Devices",

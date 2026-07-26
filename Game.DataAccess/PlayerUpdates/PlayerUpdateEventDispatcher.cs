@@ -75,8 +75,8 @@ namespace Game.DataAccess.PlayerUpdates
             }
 
             // Publish the envelope-level metadata onto the scope before the handler resolves, so a handler that
-            // reads it (none yet — the guard consuming the sequence is #2474) sees this envelope's values rather
-            // than a default. The scope is created per apply, so there is nothing to reset afterwards.
+            // reads it (via PlayerWriteWatermarkGuard) sees this envelope's values rather than a default. The
+            // scope is created per apply, so there is nothing to reset afterwards.
             _scopedProvider.GetRequiredService<PlayerUpdateContext>().Describe(envelope);
 
             await registration.Handle(_scopedProvider, envelope.Payload);

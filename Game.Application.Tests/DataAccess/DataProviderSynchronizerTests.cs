@@ -2032,6 +2032,62 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ProcessQueue_ParkedEventReclaimedAfterAnotherInstanceAppliedANewerOne_KeepsTheNewerState()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context, username: "cross-instance-stale");
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
+
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+            var togglingServices = new ToggleableServiceProvider(scope.ServiceProvider, () => new NpgsqlException("simulated connection outage")) { ShouldFail = true };
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var instanceA = new DataProviderSynchronizer(
+                togglingServices, pubsub, logger, TestRetryPolicy,
+                reclaimGracePeriod: TimeSpan.FromSeconds(30), timeProvider: timeProvider);
+
+            // A second synchronizer over the same shared queue is the whole point: the cross-pass parked-lane
+            // block (#2460) is instance-local memory, so instance B has no idea A left an event parked and
+            // applies the player's next save immediately. That is the half #2460 could not close.
+            var instanceB = new DataProviderSynchronizer(
+                scope.ServiceProvider, pubsub, new CapturingLogger<DataProviderSynchronizer>(), TestRetryPolicy,
+                reclaimGracePeriod: TimeSpan.FromSeconds(30), timeProvider: timeProvider);
+            var queue = new InMemoryPubSubQueue();
+
+            // Instance A parks the older event (sequence 1) on the shared processing list.
+            await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 9, 100, 0, 100, 100, DateTime.UtcNow, false, null), sequence: 1));
+            await instanceA.ProcessQueue(queue);
+            Assert.Single(await queue.PeekProcessingAsync(10));
+
+            // Instance B applies the player's newer save (sequence 2).
+            await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 11, 160, 0, 100, 100, DateTime.UtcNow, false, null), sequence: 2));
+            await instanceB.ProcessQueue(queue);
+
+            // A recovers and reclaims its parked event, replaying it after the newer one already landed. Before
+            // the watermark guard this durably regressed the player to level 9 / 100 exp, with Redis still
+            // holding the correct state and nothing self-correcting until the player dirtied the row again.
+            togglingServices.ShouldFail = false;
+            timeProvider.Advance(TimeSpan.FromSeconds(31));
+            await instanceA.ProcessQueue(queue);
+
+            Assert.Empty(await queue.PeekProcessingAsync(10));
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await verifyContext.Players.FindAsync([player.Id], CancellationToken);
+            Assert.NotNull(persisted);
+            Assert.Equal(11, persisted.Level);
+            Assert.Equal(160, persisted.Exp);
+
+            // The stale event is acknowledged as a successful no-op, but not silently: a reordering storm (or a
+            // bug in the sequencing itself) has to be visible on a path contracted never to drop a write.
+            Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("stale write target(s)"));
+        }
+
+        [Fact]
         public async Task ProcessQueue_ProcessingListObservedEmpty_ReleasesTheParkedLaneWithoutWaitingForAReclaim()
         {
             using var scope = CreateScope();
@@ -2140,12 +2196,16 @@ namespace Game.Application.Tests.DataAccess
             return drained;
         }
 
-        private static string Serialize<T>(T evt) where T : IDomainEvent
+        // Sequence defaults to the "unsequenced" sentinel, which is what a pre-upgrade instance's envelope
+        // carries and what makes the watermark guard (#2474) stand aside — so the scenarios below that aren't
+        // about ordering exercise the handlers exactly as they behaved before the guard existed.
+        private static string Serialize<T>(T evt, long sequence = DomainEventEnvelope.Unsequenced) where T : IDomainEvent
         {
             var envelope = new DomainEventEnvelope
             {
                 Type = typeof(T).Name,
                 Payload = evt.Serialize(),
+                Sequence = sequence,
             };
 
             return envelope.Serialize();
