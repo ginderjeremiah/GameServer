@@ -34,6 +34,10 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
             // against a stray duplicate row throwing here (see InsertIfMissingAsync's sibling helper).
             var rowsByAttributeId = currentRows.ToFirstByKey(pa => pa.AttributeId);
 
+            // Absolute upsert, zeros included: unlike the progress tier's statistics — where row absence is the
+            // "no data yet" state — an allocation row's presence is what makes its attribute allocatable at all
+            // (the #488 anti-cheat in PlayerStatPoints), so a stored 0 is the seeded state, not an empty one.
+            // Deleting it would permanently block the stat once the player falls through to a DB reload (#2459).
             foreach (var alloc in evt.Allocations)
             {
                 var attributeId = (int)alloc.Attribute;
@@ -41,16 +45,9 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
 
                 if (rowsByAttributeId.TryGetValue(attributeId, out var row))
                 {
-                    if (amount == 0)
-                    {
-                        context.PlayerAttributes.Remove(row);
-                    }
-                    else
-                    {
-                        row.Amount = amount;
-                    }
+                    row.Amount = amount;
                 }
-                else if (amount != 0)
+                else
                 {
                     context.PlayerAttributes.Add(new PlayerAttribute
                     {

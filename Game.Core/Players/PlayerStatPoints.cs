@@ -1,10 +1,19 @@
-﻿namespace Game.Core.Players
+﻿using CoreAttribute = Game.Core.Attributes.Attribute;
+
+namespace Game.Core.Players
 {
     /// <summary>
     /// Represents the stat points a player can and has allocated to core attributes.
     /// </summary>
     public class PlayerStatPoints
     {
+        /// <summary>
+        /// The attributes a player carries an allocation row for — the core (directly-allocatable) set, in
+        /// the enum's declaration order so every player's allocations read in the same canonical order.
+        /// </summary>
+        private static readonly EAttribute[] AllocatableAttributes =
+            [.. Enum.GetValues<EAttribute>().Where(CoreAttribute.IsCore)];
+
         /// <summary>
         /// The number of stat points the player has gained from levels and other sources.
         /// </summary>
@@ -17,6 +26,38 @@
 
         /// <inheritdoc cref="StatAllocation"/>
         public required List<StatAllocation> StatAllocations { get; set; }
+
+        /// <summary>
+        /// Builds the seeded allocation set every player carries: one zero-amount row per core attribute.
+        /// The rows must exist even at zero because <see cref="TryUpdateAttributes"/> rejects an allocation
+        /// into an attribute with no row (the #488 anti-cheat), so a missing row permanently blocks its stat.
+        /// The amount is zero because the class's starting spread is delivered by the level-scaled locked
+        /// base at battler assembly, never seeded into the free pool.
+        /// </summary>
+        public static List<StatAllocation> CreateAllocations()
+        {
+            return [.. AllocatableAttributes.Select(attribute => new StatAllocation { Attribute = attribute, Amount = 0d })];
+        }
+
+        /// <summary>
+        /// Restores a zero-amount row for every core attribute the player is missing one for, leaving
+        /// existing rows (and their amounts) untouched. Applied when the aggregate is rehydrated from
+        /// persistence so the seeded-row invariant <see cref="CreateAllocations"/> establishes at creation
+        /// holds for the life of the character — self-healing a player whose zero rows were dropped by the
+        /// pre-fix write-behind handler (#2459), and granting existing characters a row for a core attribute
+        /// added after they were created.
+        /// </summary>
+        public void EnsureAllocatableAttributesArePresent()
+        {
+            var allocated = StatAllocations.Select(allocation => allocation.Attribute).ToHashSet();
+            foreach (var attribute in AllocatableAttributes)
+            {
+                if (!allocated.Contains(attribute))
+                {
+                    StatAllocations.Add(new StatAllocation { Attribute = attribute, Amount = 0d });
+                }
+            }
+        }
 
         /// <summary>
         /// Attempts to apply the given <paramref name="changedAttributes"/> to the player's stat allocations.

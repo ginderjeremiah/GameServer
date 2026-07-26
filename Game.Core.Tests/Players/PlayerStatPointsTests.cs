@@ -1,5 +1,6 @@
 using Game.Core.Players;
 using Xunit;
+using CoreAttribute = Game.Core.Attributes.Attribute;
 
 namespace Game.Core.Tests.Players
 {
@@ -198,6 +199,99 @@ namespace Game.Core.Tests.Players
             Assert.False(result);
             Assert.Equal(0, stats.StatPointsUsed);
             Assert.Equal(0, stats.StatAllocations.First(a => a.Attribute == EAttribute.Strength).Amount);
+        }
+
+        [Fact]
+        public void CreateAllocations_GrantsAZeroRowForEveryCoreAttributeInEnumOrder()
+        {
+            var allocations = PlayerStatPoints.CreateAllocations();
+
+            var expected = Enum.GetValues<EAttribute>().Where(CoreAttribute.IsCore).ToList();
+            Assert.Equal(expected, allocations.Select(allocation => allocation.Attribute));
+            Assert.All(allocations, allocation => Assert.Equal(0d, allocation.Amount));
+        }
+
+        [Fact]
+        public void CreateAllocations_ReturnsIndependentRowsPerCall()
+        {
+            // Each player owns its own mutable allocation rows; a shared instance would let one character's
+            // spend leak into every other player seeded from the same call.
+            var first = PlayerStatPoints.CreateAllocations();
+            var second = PlayerStatPoints.CreateAllocations();
+
+            first[0].Amount = 7d;
+
+            Assert.Equal(0d, second[0].Amount);
+        }
+
+        [Fact]
+        public void EnsureAllocatableAttributesArePresent_MissingCoreRows_RestoresThemAtZero()
+        {
+            // The state a player is left in by a DB reload after the pre-fix write-behind handler deleted
+            // their zero-amount rows (#2459): only the allocated attribute survives, so every other stat is
+            // permanently unallocatable until its row comes back.
+            var allocations = new List<StatAllocation>
+            {
+                new() { Attribute = EAttribute.Strength, Amount = 1d },
+            };
+            var stats = new PlayerStatPoints { StatAllocations = allocations, StatPointsGained = 10, StatPointsUsed = 1 };
+
+            stats.EnsureAllocatableAttributesArePresent();
+
+            var expected = Enum.GetValues<EAttribute>().Where(CoreAttribute.IsCore).ToHashSet();
+            Assert.Equal(expected, stats.StatAllocations.Select(allocation => allocation.Attribute).ToHashSet());
+            Assert.Equal(1d, stats.StatAllocations.Single(a => a.Attribute == EAttribute.Strength).Amount);
+            Assert.All(
+                stats.StatAllocations.Where(a => a.Attribute != EAttribute.Strength),
+                allocation => Assert.Equal(0d, allocation.Amount));
+        }
+
+        [Fact]
+        public void EnsureAllocatableAttributesArePresent_RestoredRow_BecomesAllocatableAgain()
+        {
+            // The repair's whole point: the restored row lifts the #488 rejection, so the previously blocked
+            // stat accepts an allocation instead of failing forever.
+            var allocations = new List<StatAllocation>
+            {
+                new() { Attribute = EAttribute.Strength, Amount = 1d },
+            };
+            var stats = new PlayerStatPoints { StatAllocations = allocations, StatPointsGained = 10, StatPointsUsed = 1 };
+            Assert.False(stats.TryUpdateAttributes([new Update(EAttribute.Dexterity, 2)]));
+
+            stats.EnsureAllocatableAttributesArePresent();
+
+            Assert.True(stats.TryUpdateAttributes([new Update(EAttribute.Dexterity, 2)]));
+            Assert.Equal(3, stats.StatPointsUsed);
+            Assert.Equal(2d, stats.StatAllocations.Single(a => a.Attribute == EAttribute.Dexterity).Amount);
+        }
+
+        [Fact]
+        public void EnsureAllocatableAttributesArePresent_AlreadyComplete_IsAnIdempotentNoOp()
+        {
+            var stats = MakeStats(gained: 10, used: 2);
+            stats.StatAllocations.First(a => a.Attribute == EAttribute.Strength).Amount = 2d;
+
+            stats.EnsureAllocatableAttributesArePresent();
+            stats.EnsureAllocatableAttributesArePresent();
+
+            Assert.Equal(6, stats.StatAllocations.Count);
+            Assert.Equal(2d, stats.StatAllocations.Single(a => a.Attribute == EAttribute.Strength).Amount);
+        }
+
+        [Fact]
+        public void EnsureAllocatableAttributesArePresent_NonCoreRow_IsPreservedRatherThanDropped()
+        {
+            // A row for a non-core attribute shouldn't exist, but player data is never silently discarded:
+            // the repair only fills gaps, it does not prune.
+            var allocations = new List<StatAllocation>
+            {
+                new() { Attribute = EAttribute.MaxHealth, Amount = 5d },
+            };
+            var stats = new PlayerStatPoints { StatAllocations = allocations, StatPointsGained = 10, StatPointsUsed = 0 };
+
+            stats.EnsureAllocatableAttributesArePresent();
+
+            Assert.Equal(5d, stats.StatAllocations.Single(a => a.Attribute == EAttribute.MaxHealth).Amount);
         }
 
         private static PlayerStatPoints MakeStats(int gained, int used)

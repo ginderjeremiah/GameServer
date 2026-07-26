@@ -1,4 +1,3 @@
-using Game.Core.Attributes;
 using Game.Core.Classes;
 
 namespace Game.Core.Players
@@ -58,17 +57,10 @@ namespace Game.Core.Players
                 StatPointsUsed = 0,
                 Skills = starterSkills,
                 Equipment = starterEquipment,
-                // Seed an empty allocation row for exactly the core (directly-allocatable) attributes, derived
-                // from the attribute set itself rather than a hardcoded count — so adding a seventh core
-                // attribute automatically grants new players its allocation row (without one, PlayerStatPoints
-                // rejects every allocation into it, permanently blocking the stat). The amount is zero: the
-                // class's starting spread is delivered by the level-scaled locked base at battler assembly, not
-                // seeded here, so the free pool the player allocates begins empty and the locked base is never
-                // double-counted.
-                Attributes = Enum.GetValues<EAttribute>()
-                    .Where(Attribute.IsCore)
-                    .Select(attribute => new StatAllocation { Attribute = attribute, Amount = 0d })
-                    .ToList(),
+                // The seeded allocation rows are owned by PlayerStatPoints — the same set the rehydration path
+                // re-establishes — so creation and reload can never disagree on which attributes a player can
+                // allocate into.
+                Attributes = PlayerStatPoints.CreateAllocations(),
                 LogPreferences = CreateDefaultLogPreferences(),
             };
         }
