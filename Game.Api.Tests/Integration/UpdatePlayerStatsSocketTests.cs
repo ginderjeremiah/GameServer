@@ -112,11 +112,12 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
-        public async Task UpdatePlayerStats_UnknownAttribute_ReturnsErrorAndLeavesAllocationsUnchanged()
+        public async Task UpdatePlayerStats_DerivedAttribute_ReturnsErrorAndLeavesAllocationsUnchanged()
         {
-            // 6 available points (106 gained − 100 used). The seeded player only has rows for Strength and
-            // Endurance, so Luck has no allocation row — allocating into it must be rejected rather than
-            // silently reporting success, and the valid Strength delta in the same set must not apply (#488).
+            // 6 available points (106 gained − 100 used). Only the core attributes carry an allocation row, so
+            // a derived one (MaxHealth, computed from Endurance) has none — allocating into it must be rejected
+            // rather than silently reporting success, and the valid Strength delta in the same set must not
+            // apply (#488).
             var (userId, _) = await SeedPlayerAsync(statPointsGained: 106);
             await LoginAsync(Username, Password);
 
@@ -127,7 +128,7 @@ namespace Game.Api.Tests.Integration
             var updates = new[]
             {
                 new { attributeId = (int)EAttribute.Strength, amount = 3 },
-                new { attributeId = (int)EAttribute.Luck, amount = 2 },
+                new { attributeId = (int)EAttribute.MaxHealth, amount = 2 },
             };
             var response = await socketClient.SendCommandAsync<UpdatePlayerStatsResponse>("UpdatePlayerStats", updates);
 
@@ -135,6 +136,28 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(response.Data);
             Assert.Equal(50m, response.Data.Attributes.Single(a => a.AttributeId == EAttribute.Strength).Amount);
             Assert.Equal(100, response.Data.StatPointsUsed);
+        }
+
+        [Fact]
+        public async Task UpdatePlayerStats_CoreAttributeWithNoPersistedRow_IsStillAllocatable()
+        {
+            // The seeder persists rows only for Strength and Endurance, so Luck reaches the loaded aggregate
+            // solely through the rehydration reseed. It must be allocatable: the #488 row-presence anti-cheat
+            // is meant to block derived attributes, not to strand a core one whose row went missing (#2459).
+            var (userId, _) = await SeedPlayerAsync(statPointsGained: 106);
+            await LoginAsync(Username, Password);
+
+            await using var socketClient = new TestSocketClient();
+            var wsClient = Factory.Server.CreateWebSocketClient();
+            await socketClient.ConnectAsync(wsClient, userId);
+
+            var updates = new[] { new { attributeId = (int)EAttribute.Luck, amount = 2 } };
+            var response = await socketClient.SendCommandAsync<UpdatePlayerStatsResponse>("UpdatePlayerStats", updates);
+
+            Assert.Null(response.Error);
+            Assert.NotNull(response.Data);
+            Assert.Equal(2m, response.Data.Attributes.Single(a => a.AttributeId == EAttribute.Luck).Amount);
+            Assert.Equal(102, response.Data.StatPointsUsed);
         }
 
         /// <summary>

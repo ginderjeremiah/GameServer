@@ -15,6 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using StackExchange.Redis;
 using Xunit;
+using CoreAttribute = Game.Core.Attributes.Attribute;
 
 namespace Game.Application.Tests.Services
 {
@@ -137,6 +138,55 @@ namespace Game.Application.Tests.Services
             var result = await playerService.TryUpdateAttributes(player, updates);
 
             Assert.False(result);
+        }
+
+        [Fact]
+        public async Task TryUpdateAttributes_ThenDrainedAndReloadedFromDb_KeepsEveryCoreAttributeAllocatable()
+        {
+            // The full loop #2459 broke: allocate → write-behind drain → Redis key lapses → DB fall-through
+            // reload. The event carries the player's whole allocation list, zeros included, so a handler that
+            // dropped the zero rows left the DB holding only the allocated stat — and every other core
+            // attribute permanently unallocatable behind the #488 row-presence anti-cheat.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            playerEntity.StatPointsGained = 110;
+            await context.SaveChangesAsync(CancellationToken);
+
+            await ReloadReferenceCachesAsync();
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            Assert.True(await playerService.TryUpdateAttributes(player, [new SimpleAttributeUpdate(EAttribute.Strength, 3)]));
+            await DrainPlayerUpdateQueue(scope.ServiceProvider);
+
+            // Drop the cached blob so the reload is a genuine DB fall-through rather than a Redis hit that
+            // would carry the in-memory allocations along and hide a damaged row set.
+            var options = ConfigurationOptions.Parse(Containers.CacheConnectionString);
+            using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
+            await multiplexer.GetDatabase().KeyDeleteAsync($"{Constants.CACHE_PLAYER_PREFIX}_{playerEntity.Id}");
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await verifyContext.PlayerAttributes.AsNoTracking()
+                .Where(pa => pa.PlayerId == playerEntity.Id)
+                .ToListAsync(CancellationToken);
+            var expectedCoreAttributes = Enum.GetValues<EAttribute>().Where(CoreAttribute.IsCore).ToHashSet();
+            Assert.Equal(expectedCoreAttributes, persisted.Select(pa => (EAttribute)pa.AttributeId).ToHashSet());
+            // The seeded player starts at 50 Strength, so the spend lands on top of it.
+            Assert.Equal(53m, Assert.Single(persisted, pa => pa.AttributeId == (int)EAttribute.Strength).Amount);
+
+            // The reloaded aggregate can still spend into a stat it has never allocated into.
+            var reloaded = await verifyScope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(playerEntity.Id);
+            Assert.NotNull(reloaded);
+            var reloadedService = verifyScope.ServiceProvider.GetRequiredService<PlayerService>();
+            Assert.True(await reloadedService.TryUpdateAttributes(reloaded, [new SimpleAttributeUpdate(EAttribute.Dexterity, 2)]));
+            Assert.Equal(2d, reloaded.StatPoints.StatAllocations.Single(a => a.Attribute == EAttribute.Dexterity).Amount);
         }
 
         [Fact]

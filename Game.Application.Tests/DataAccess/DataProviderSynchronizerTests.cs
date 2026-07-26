@@ -813,7 +813,7 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
-        public async Task ProcessQueue_AttributeAllocationsChangedEvent_UpsertsInsertsAndDeletesIdempotently()
+        public async Task ProcessQueue_AttributeAllocationsChangedEvent_UpsertsEveryAllocationIdempotently()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -822,8 +822,9 @@ namespace Game.Application.Tests.DataAccess
             // The seeder gives the player Strength = 50 and Endurance = 50 allocations to start.
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
 
-            // One event exercising all three branches: update an existing allocation (Strength),
-            // delete an existing one by zeroing it (Endurance), and insert a brand-new one (Agility).
+            // One event exercising every branch: update an existing allocation (Strength), zero an existing one
+            // (Endurance — stored as 0, never deleted, or the stat becomes unallocatable after a DB reload,
+            // #2459), and insert a brand-new one (Agility).
             var evt = new AttributeAllocationsChangedEvent(player.Id, new List<AttributeAllocationEntry>
             {
                 new(EAttribute.Strength, 75d),
@@ -849,11 +850,11 @@ namespace Game.Application.Tests.DataAccess
                 .Where(pa => pa.PlayerId == player.Id)
                 .ToListAsync(CancellationToken);
 
-            // Strength updated, Agility inserted, Endurance deleted (zeroed out).
-            Assert.Equal(2, rows.Count);
+            // Strength updated, Agility inserted, Endurance kept at a stored 0.
+            Assert.Equal(3, rows.Count);
             Assert.Equal(75m, Assert.Single(rows, pa => pa.AttributeId == (int)EAttribute.Strength).Amount);
             Assert.Equal(30m, Assert.Single(rows, pa => pa.AttributeId == (int)EAttribute.Agility).Amount);
-            Assert.DoesNotContain(rows, pa => pa.AttributeId == (int)EAttribute.Endurance);
+            Assert.Equal(0m, Assert.Single(rows, pa => pa.AttributeId == (int)EAttribute.Endurance).Amount);
         }
 
         [Fact]

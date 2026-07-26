@@ -5,6 +5,7 @@ using Game.Core.Players;
 using Game.Core.Players.Inventories;
 using Game.DataAccess.Mapping;
 using Xunit;
+using CoreAttribute = Game.Core.Attributes.Attribute;
 using CoreItem = Game.Core.Items.Item;
 using CoreItemMod = Game.Core.Items.ItemMod;
 using CoreSkill = Game.Core.Skills.Skill;
@@ -127,6 +128,24 @@ namespace Game.Application.Tests.Mapping
             Assert.Equal(3, lesson.LessonId);
             Assert.Equal(MappedLastActivity, lesson.UnlockedAt);
             Assert.Null(lesson.ReadAt);
+        }
+
+        [Fact]
+        public void ToCore_MissingCoreAllocationRows_AreRestoredAtZero()
+        {
+            // A player persisted with only their non-zero allocation — the shape the pre-fix write-behind
+            // handler left behind (#2459) — must rehydrate with the full seeded set, or every other core stat
+            // stays permanently unallocatable behind the #488 row-presence anti-cheat.
+            var model = BuildModel(statAllocations: [new() { Attribute = EAttribute.Strength, Amount = 5d }]);
+
+            var player = PlayerCacheMapper.ToCore(model, Catalog(), Catalog(), Catalog());
+
+            var expected = Enum.GetValues<EAttribute>().Where(CoreAttribute.IsCore).ToHashSet();
+            Assert.Equal(expected, player.StatPoints.StatAllocations.Select(a => a.Attribute).ToHashSet());
+            Assert.Equal(5d, player.StatPoints.StatAllocations.Single(a => a.Attribute == EAttribute.Strength).Amount);
+            Assert.All(
+                player.StatPoints.StatAllocations.Where(a => a.Attribute != EAttribute.Strength),
+                allocation => Assert.Equal(0d, allocation.Amount));
         }
 
         [Fact]
