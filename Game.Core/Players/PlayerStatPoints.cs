@@ -100,7 +100,7 @@ namespace Game.Core.Players
             var createdAllocations = new List<StatAllocation>();
             foreach (var update in changedAttributes)
             {
-                if (!CoreAttribute.IsCore(update.Attribute) || matchedUpdates.ContainsKey(update.Attribute))
+                if (!CoreAttribute.IsCore(update.Attribute))
                 {
                     return false;
                 }
@@ -111,7 +111,10 @@ namespace Game.Core.Players
                     createdAllocations.Add(allocation);
                 }
 
-                matchedUpdates.Add(update.Attribute, (allocation, update));
+                if (!matchedUpdates.TryAdd(update.Attribute, (allocation, update)))
+                {
+                    return false;
+                }
             }
 
             // long accumulator: matchedUpdates.Values.Sum for int uses checked arithmetic and would
