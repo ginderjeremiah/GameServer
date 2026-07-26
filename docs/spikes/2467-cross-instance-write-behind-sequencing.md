@@ -132,12 +132,23 @@ the data row — which can be the older event. The guard is therefore a **condit
 
 ```sql
 UPDATE "PlayerWriteWatermark" SET "LastAppliedSequence" = @seq
-WHERE "PlayerId" = @p AND "Stream" = @s AND "TargetKey" = @k AND "LastAppliedSequence" < @seq
+WHERE "PlayerId" = @p AND "Stream" = @s AND "TargetKey" = @k AND "LastAppliedSequence" <= @seq
 ```
 
 taking the row lock first, with the data write applied only when it reports rows-affected > 0, and both in
-one transaction. A missing watermark row is an insert-if-missing before the conditional update (or an
-`INSERT … ON CONFLICT DO UPDATE … WHERE`), so a first-ever write for a target isn't rejected.
+one transaction. A missing watermark row is an insert-if-missing seeded at `@seq` before the conditional
+update (or an `INSERT … ON CONFLICT DO UPDATE … WHERE`), so a first-ever write for a target isn't rejected.
+
+**The predicate is `<=`, not `<`** — it has to mirror the reject-only-on-strictly-older rule above, and the
+difference is not cosmetic. Under `<` the statement applies only when the watermark is *strictly* below the
+event, which rejects equal sequences: same-save siblings landing on one target would have the first advance
+the row and the second silently skipped, every sequence-0 envelope from a pre-upgrade instance would be
+discarded once that target's row existed at 0 (inverting the whole point of defaulting `Sequence` for
+rolling deploys), and the insert-if-missing seed would have no working value — seeded at `@seq`, the
+conditional update that follows would immediately no-op. `<=` collapses all three. The cost is that an
+exact duplicate re-applies rather than being skipped, paying one redundant no-op write; that is the correct
+trade under the queue's at-least-once contract and is the same choice §1 already made, so don't "optimize"
+it back to `<`.
 
 **That transaction is a new pattern on this path, and it is the real cost of the design — not a free
 round-trip ride.** An earlier draft of this doc claimed the watermark upsert costs nothing because it rides
@@ -206,9 +217,16 @@ Neither is necessary. Key the equipment stream on **both** the item and the slot
 
 The item key is what catches the mirror case a slot key alone misses — a later save moving A from slot1 to
 slot2 leaves `slot1` untouched, so only `item=A` being at the newer sequence stops a replayed `A→slot1`
-from dragging it back. Both keys are needed; either alone has a hole. The cost is two watermark rows locked
-per equip, so #2474 must lock them in a deterministic order (item then slot) to avoid deadlocking two
-concurrent equips against each other.
+from dragging it back. It also covers unequip, which involves no slot at all: `seq 6` unequipping A stamps
+`item=A` to 6, so a replayed `seq 5` equip is rejected on the item key alone. Both keys are needed; either
+alone has a hole.
+
+**The two checks are all-or-nothing.** If one key passes and the other rejects, the whole apply rolls back
+with *neither* watermark advanced — a partial advance would leave one key claiming a write that never
+happened, which is the same silently-lost-write shape the transaction requirement above exists to prevent.
+The surrounding transaction gives this for free, but it is too load-bearing to leave to inference. The
+other cost is two watermark rows locked per equip, so #2474 must lock them in a deterministic order (item
+then slot) to avoid deadlocking two concurrent equips against each other.
 
 ### 3. How a stale event is disposed of — acknowledged, counted, and surfaced
 
