@@ -1,5 +1,5 @@
+import type { IPath, IProficiency } from '$lib/api';
 import { tiersOfPath } from './progression-helpers';
-import type { WorkbenchPath, WorkbenchProficiency } from './types';
 
 /** A tier rendered as a node in a path column of the cross-path Map view. */
 export interface MapNode {
@@ -34,7 +34,7 @@ export interface MapEdge {
 export const tierNodeId = (tierId: number): string => `t${tierId}`;
 
 /** Project the catalogues into one column per path, each holding its ordered tier nodes. */
-export const mapColumns = (paths: WorkbenchPath[], profs: WorkbenchProficiency[]): MapColumn[] =>
+export const mapColumns = (paths: IPath[], profs: IProficiency[]): MapColumn[] =>
 	paths.map((path) => {
 		const nodes: MapNode[] = tiersOfPath(profs, path.id).map((tier) => ({
 			id: tier.id,
@@ -59,7 +59,7 @@ export const mapColumns = (paths: WorkbenchPath[], profs: WorkbenchProficiency[]
  * absent from the current set (e.g. never authored) still yields a def; the measurer drops it when
  * its node element can't be found, mirroring the mockup.
  */
-export const mapEdgeDefs = (profs: WorkbenchProficiency[]): MapEdge[] => {
+export const mapEdgeDefs = (profs: IProficiency[]): MapEdge[] => {
 	const defs: MapEdge[] = [];
 	for (const prof of profs) {
 		for (const prereqId of prof.prerequisiteIds) {

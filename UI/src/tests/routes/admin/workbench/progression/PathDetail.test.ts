@@ -1,13 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, waitFor } from '@testing-library/svelte';
-import { EActivityKey } from '$lib/api';
+import { EActivityKey, type IProficiency } from '$lib/api';
 
 // `vi.mock` is hoisted within this file, so the factory resolves the shared stub by dynamic import
 // rather than closing over the static one below.
 vi.mock('$stores', async () => (await import('./progression-test-utils')).stubStores());
 
 import PathDetail from '$routes/admin/workbench/progression/PathDetail.svelte';
-import type { WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
 import {
 	dangerModal,
 	makePathStore as makeStore,
@@ -19,8 +18,7 @@ import {
 
 // PathDetail's retire check walks the tiers carrying the selected path's id, so tiers here default
 // onto path 5 (`path()`'s id) rather than the shared fixture's path 0.
-const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProficiency =>
-	baseTier({ pathId: path().id, ...over });
+const tier = (over: Partial<IProficiency> = {}): IProficiency => baseTier({ pathId: path().id, ...over });
 
 beforeEach(resetStores);
 afterEach(cleanup);

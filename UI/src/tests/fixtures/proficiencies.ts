@@ -4,10 +4,10 @@ import { EActivityKey, type IPath, type IProficiency } from '$lib/api';
 
    · `lexicon-test-utils.ts` builds the derived `PathView` / `TierView` the Lexicon renders — a suite that
      needs both wants this module for the inputs and that one for the outputs.
-   · `progression/progression-test-utils.ts` (`path`/`tier`) builds `WorkbenchPath`/`WorkbenchProficiency`,
-     which are *plain aliases* of these same two contracts, so it now builds on this module (#2426). Its
-     blank conlang defaults and `xpGrowth: 1.4` deliberately diverge from the defaults here — they are
-     load-bearing for the workbench detail suites — and are stated as overrides at those two wrappers. */
+   · `progression/progression-test-utils.ts` (`path`/`tier`) builds these same two contracts for the
+     workbench, so it builds on this module (#2426). Its blank conlang defaults and `xpGrowth: 1.4`
+     deliberately diverge from the defaults here — they are load-bearing for the workbench detail
+     suites — and are stated as overrides at those two wrappers. */
 
 /**
  * Builds an {@link IProficiency} reference-data entry for tests. The conlang and icon fields are generated

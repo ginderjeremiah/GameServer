@@ -66,6 +66,7 @@
 {/if}
 
 <script lang="ts">
+import type { IProficiency } from '$lib/api';
 import { childChanged } from '../save-helpers';
 import { referenceSourcesFromStatic, retireWithConfirm } from '../retire-confirm';
 import type { ProgressionStore, TierTab } from './progression-store.svelte';
@@ -80,7 +81,6 @@ import ConlangIdentity from './ConlangIdentity.svelte';
 import XpCurve from './XpCurve.svelte';
 import MilestonesEditor from './MilestonesEditor.svelte';
 import GatewaysEditor from './GatewaysEditor.svelte';
-import type { WorkbenchProficiency } from './types';
 
 interface Props {
 	store: ProgressionStore;
@@ -95,7 +95,7 @@ const tier = $derived(store.drilledTier);
  * synthesis-recipe condition, or another tier's cross-path prerequisite. The progression editor isn't
  * a generic `EntityConfig`, so it can't go through `WorkbenchDetail`'s onRetire; this mirrors it.
  */
-const onRetire = (rec: WorkbenchProficiency) =>
+const onRetire = (rec: IProficiency) =>
 	retireWithConfirm({
 		entityKey: 'proficiencies',
 		id: rec.id,

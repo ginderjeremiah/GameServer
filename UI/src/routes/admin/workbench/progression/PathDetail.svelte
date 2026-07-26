@@ -71,6 +71,7 @@
 {/if}
 
 <script lang="ts">
+import type { IPath } from '$lib/api';
 import {
 	PATH_DESCRIPTION_MAX_LENGTH,
 	PATH_DESIGNER_NOTES_MAX_LENGTH,
@@ -79,7 +80,6 @@ import {
 import { denseByLiveId, referenceSourcesFromStatic, retireWithConfirm } from '../retire-confirm';
 import type { ProgressionStore, PathTab } from './progression-store.svelte';
 import { activityKeyGroups, hasTierCollision, pathWarnings } from './progression-helpers';
-import type { WorkbenchPath } from './types';
 import DetailHeader from '../components/DetailHeader.svelte';
 import ProgInput from './ProgInput.svelte';
 import ProgSelect from './ProgSelect.svelte';
@@ -102,7 +102,7 @@ const { store }: Props = $props();
  * dense-by-id rebuild since `addPath` prepends unsaved paths with negative ids, unlike `profs`
  * which `pathReferences`/`proficiencyReferences` only ever `.filter()`, never index by id.
  */
-const onRetire = (rec: WorkbenchPath) =>
+const onRetire = (rec: IPath) =>
 	retireWithConfirm({
 		entityKey: 'paths',
 		id: rec.id,

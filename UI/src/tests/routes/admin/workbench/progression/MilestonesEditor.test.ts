@@ -1,17 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
-import { EAttribute, EModifierType } from '$lib/api';
+import { EAttribute, EModifierType, type IProficiency } from '$lib/api';
 
 // MilestonesEditor's Reward-skill select reads staticData.skills via the reference module. `vi.mock` is
 // hoisted within this file, so the factory resolves the shared stub by dynamic import.
 vi.mock('$stores', async () => (await import('./progression-test-utils')).stubStores());
 
 import MilestonesEditor from '$routes/admin/workbench/progression/MilestonesEditor.svelte';
-import type { WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
 import { asStore, resetStores, tier as baseTier } from './progression-test-utils';
 
 // The payout assertions below target tier id 5.
-const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProficiency => baseTier({ id: 5, ...over });
+const tier = (over: Partial<IProficiency> = {}): IProficiency => baseTier({ id: 5, ...over });
 
 // A fake store exposing exactly what MilestonesEditor reads/calls.
 const makeStore = (selectedLevel: number, overrides: Record<string, unknown> = {}) =>

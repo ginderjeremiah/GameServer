@@ -39,14 +39,14 @@
 </div>
 
 <script lang="ts">
+import type { IProficiency } from '$lib/api';
 import type { ProgressionStore } from './progression-store.svelte';
 import { xpCostCurve } from './progression-helpers';
-import type { WorkbenchProficiency } from './types';
 import ProgNumber from './ProgNumber.svelte';
 
 interface Props {
 	store: ProgressionStore;
-	tier: WorkbenchProficiency;
+	tier: IProficiency;
 }
 
 const { store, tier }: Props = $props();

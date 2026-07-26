@@ -1,13 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent, waitFor } from '@testing-library/svelte';
-import { EAttribute, EModifierType, ESkillAcquisition } from '$lib/api';
+import { EAttribute, EModifierType, ESkillAcquisition, type IProficiency } from '$lib/api';
 
 // `vi.mock` is hoisted within this file, so the factory resolves the shared stub by dynamic import
 // rather than closing over the static one below.
 vi.mock('$stores', async () => (await import('./progression-test-utils')).stubStores());
 
 import TierDetail from '$routes/admin/workbench/progression/TierDetail.svelte';
-import type { WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
 import {
 	dangerModal,
 	makeTierStore as makeStore,
@@ -18,7 +17,7 @@ import {
 
 // Tiers here carry id 5 and populated conlang fields: the retire/tab assertions below target id 5,
 // and ConlangIdentity's decipher preview reads the authored word/pronunciation/translation.
-const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProficiency =>
+const tier = (over: Partial<IProficiency> = {}): IProficiency =>
 	baseTier({
 		id: 5,
 		iconPath: 'i.png',

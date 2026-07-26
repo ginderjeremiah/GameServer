@@ -104,6 +104,7 @@
 </div>
 
 <script lang="ts">
+import type { IProficiency } from '$lib/api';
 import {
 	PROFICIENCY_DESCRIPTION_MAX_LENGTH,
 	PROFICIENCY_DESIGNER_NOTES_MAX_LENGTH,
@@ -116,12 +117,11 @@ import {
 import WordOfPower from '$components/WordOfPower.svelte';
 import type { ProgressionStore } from './progression-store.svelte';
 import { decipherThresholds } from './progression-helpers';
-import type { WorkbenchProficiency } from './types';
 import ProgInput from './ProgInput.svelte';
 
 interface Props {
 	store: ProgressionStore;
-	tier: WorkbenchProficiency;
+	tier: IProficiency;
 }
 
 const { store, tier }: Props = $props();

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EActivityKey, EAttribute, EModifierType, ESkillAcquisition } from '$lib/api';
+import { EActivityKey, EAttribute, EModifierType, ESkillAcquisition, type IProficiency } from '$lib/api';
 
 // `vi.mock` is hoisted within this file, so the factory resolves the shared stub by dynamic import
 // rather than closing over the static one below.
@@ -27,12 +27,11 @@ import {
 	tiersOfPath,
 	xpCostCurve
 } from '$routes/admin/workbench/progression/progression-helpers';
-import type { WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
 import { resetStores, staticData } from './progression-test-utils';
 
 beforeEach(resetStores);
 
-const tier = (overrides: Partial<WorkbenchProficiency> & Pick<WorkbenchProficiency, 'id'>): WorkbenchProficiency => ({
+const tier = (overrides: Partial<IProficiency> & Pick<IProficiency, 'id'>): IProficiency => ({
 	...newProficiency(overrides.id, overrides.pathId ?? 1, overrides.pathOrdinal ?? 0),
 	...overrides
 });
