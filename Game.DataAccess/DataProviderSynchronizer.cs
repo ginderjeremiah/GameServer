@@ -371,15 +371,25 @@ namespace Game.DataAccess
             // (playerLanes) that only starts an item once the previous same-player item has fully applied and
             // acknowledged — and, for a lane left blocked by a fault, across passes too via _parkedPlayerLanes
             // (#2460), since playerLanes itself is pass-scoped. The concurrency gate is acquired before
-            // reserving, not just before processing, so reservation itself is bounded by the same budget — a
-            // stop still ends at a bounded (not unbounded) number of in-flight items, reclaimed on the next
-            // startup if the drain timeout is exceeded. Once an item is reserved its apply and acknowledge run
+            // reserving, not just before processing, so reservation is bounded by the same budget for every item
+            // that actually applies — a stop still ends at a bounded (not unbounded) number of in-flight items,
+            // reclaimed on the next startup if the drain timeout is exceeded. An item *deferred* by a blocked
+            // parked lane is the deliberate exception: it does no work, so it hands its slot straight back and
+            // a pass can sweep an arbitrary number of them onto the processing list. That is load-bearing rather
+            // than an oversight — the stranded-processing reclaim that replays the parked chain only runs once
+            // the main queue is empty, so throttling the sweep would delay recovery (and stall players queued
+            // behind a blocked one) to bound a list the same items reach anyway. Once an item is reserved to
+            // apply, its apply and acknowledge run
             // without the token so the in-flight write finishes cleanly — only the dead-time retry backoff
             // between failed attempts honors the token (a stop during it abandons the retry, and the reserved
             // item is reclaimed and re-applied on the next startup).
             var playerLanes = new Dictionary<int, Task>();
             var inFlight = new List<Task>();
             using var concurrencyGate = new SemaphoreSlim(_maxConcurrentDrainItems);
+
+            // Players this pass has already reported a deferral for, so a blocked player's backlog logs once
+            // rather than once per item. Pass-scoped: a still-blocked player is worth one line per pass.
+            var deferredPlayers = new HashSet<int>();
 
             // Sweep completed entries out of both collections once they grow past this many, so a large-backlog
             // pass — the exact case #1701 targets — retains roughly the concurrency budget rather than the
@@ -453,9 +463,17 @@ namespace Game.DataAccess
                         // whole same-player chain to the queue head in its original order, so the deferral
                         // costs convergence latency for this one player, never the write itself.
                         concurrencyGate.Release();
-                        _logger.LogDebug(
-                            "Deferring a player update for player {PlayerId} on queue '{Queue}': an earlier same-player event is still reserved awaiting reclaim, so this item is left reserved to preserve ordering.",
-                            playerId, Constants.PUBSUB_PLAYER_QUEUE);
+
+                        // Once per player per pass, not once per item: a blocked hot player's whole backlog
+                        // defers here and re-defers on every reclaim cycle, and this class is deliberate about
+                        // log volume elsewhere (_infrastructureOutageLogged, _lastReportedDeadLetterDepth).
+                        if (deferredPlayers.Add(playerId))
+                        {
+                            _logger.LogDebug(
+                                "Deferring player update(s) for player {PlayerId} on queue '{Queue}': an earlier same-player event is still reserved awaiting reclaim, so they are left reserved to preserve ordering.",
+                                playerId, Constants.PUBSUB_PLAYER_QUEUE);
+                        }
+
                         continue;
                     }
 
@@ -495,7 +513,9 @@ namespace Game.DataAccess
         /// head must stay in the map so a later same-player item chains onto it and faults in turn — staying
         /// reserved for the reclaim — rather than starting a fresh lane and applying <em>ahead</em> of the
         /// failed item's eventual reclaim/re-apply, which would break same-player ordering exactly on the
-        /// fault path. Keeping them in <paramref name="inFlight"/> likewise keeps the drain-exit settle aware
+        /// fault path. This covers the narrow window <see cref="_parkedPlayerLanes"/> (the primary guard, which
+        /// blocks the lane across passes) cannot: a same-player item reserved <em>before</em> the faulting task
+        /// records the block. Keeping them in <paramref name="inFlight"/> likewise keeps the drain-exit settle aware
         /// of them. A lane is only evicted when its <em>current</em> (most recently chained) task has
         /// completed — a still-running or not-yet-started successor for that player is left untouched, so a
         /// later item for the same player still correctly chains onto it rather than a stale completed entry.

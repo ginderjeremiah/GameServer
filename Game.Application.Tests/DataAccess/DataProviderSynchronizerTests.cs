@@ -1902,6 +1902,7 @@ namespace Game.Application.Tests.DataAccess
             // must not apply: the parked event's replay would regress these absolute values afterwards (#2460).
             togglingServices.ShouldFail = false;
             await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 10, 150, 0, 100, 100, DateTime.UtcNow, false, null)));
+            await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 11, 160, 0, 100, 100, DateTime.UtcNow, false, null)));
             await synchronizer.ProcessQueue(queue);
 
             using (var deferredScope = CreateScope())
@@ -1912,12 +1913,13 @@ namespace Game.Application.Tests.DataAccess
                 Assert.Equal(5, deferred.Level);
             }
 
-            // Both stay reserved, in their original order, and the deferral is surfaced rather than silent.
-            Assert.Equal(2, (await queue.PeekProcessingAsync(10)).Count);
-            Assert.Contains(logger.Entries, e => e.Level == LogLevel.Debug && e.Message.Contains("Deferring a player update"));
+            // All three stay reserved, in their original order, and the deferral is surfaced rather than silent —
+            // once for the player, not once per deferred item.
+            Assert.Equal(3, (await queue.PeekProcessingAsync(10)).Count);
+            Assert.Equal(1, logger.Entries.Count(e => e.Level == LogLevel.Debug && e.Message.Contains("Deferring player update(s)")));
 
-            // Once the grace period elapses the reclaim re-queues both to the queue head in order, so they
-            // apply oldest-first and the newer event's values are what survive.
+            // Once the grace period elapses the reclaim re-queues all three to the queue head in order, so they
+            // apply oldest-first and the newest event's values are what survive.
             timeProvider.Advance(TimeSpan.FromSeconds(31));
             await synchronizer.ProcessQueue(queue);
 
@@ -1928,8 +1930,8 @@ namespace Game.Application.Tests.DataAccess
             var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
             var persisted = await verifyContext.Players.FindAsync([player.Id], CancellationToken);
             Assert.NotNull(persisted);
-            Assert.Equal(10, persisted.Level);
-            Assert.Equal(150, persisted.Exp);
+            Assert.Equal(11, persisted.Level);
+            Assert.Equal(160, persisted.Exp);
         }
 
         [Fact]
@@ -2009,13 +2011,63 @@ namespace Game.Application.Tests.DataAccess
             await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 10, 150, 0, 100, 100, DateTime.UtcNow, false, null)));
             await synchronizer.ProcessQueue(queue);
 
-            // Still deferred on this pass — the block is released by the reclaim, which the grace period gates.
+            // Still deferred on this pass: the newer event was reserved before the reclaim check ran, so the
+            // processing list is non-empty and only the reclaim (grace-period gated) can release the block here.
+            // The empty-list release path is covered by ...ProcessingListObservedEmpty... below.
             Assert.Single(await queue.PeekProcessingAsync(10));
 
             timeProvider.Advance(TimeSpan.FromSeconds(31));
             await synchronizer.ProcessQueue(queue);
 
             Assert.Empty(await queue.PeekProcessingAsync(10));
+            Assert.Empty(await DrainDeadLetterQueue(pubsub));
+
+            using var verifyScope = CreateScope();
+            var verifyContext = verifyScope.ServiceProvider.GetRequiredService<GameContext>();
+            var persisted = await verifyContext.Players.FindAsync([player.Id], CancellationToken);
+            Assert.NotNull(persisted);
+            Assert.Equal(10, persisted.Level);
+            Assert.Equal(150, persisted.Exp);
+        }
+
+        [Fact]
+        public async Task ProcessQueue_ProcessingListObservedEmpty_ReleasesTheParkedLaneWithoutWaitingForAReclaim()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context, username: "cross-pass-empty");
+            var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, level: 5);
+
+            var togglingServices = new ToggleableServiceProvider(scope.ServiceProvider, () => new NpgsqlException("simulated connection outage")) { ShouldFail = true };
+            var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
+            var logger = new CapturingLogger<DataProviderSynchronizer>();
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+            var synchronizer = new DataProviderSynchronizer(
+                togglingServices, pubsub, logger, TestRetryPolicy,
+                reclaimGracePeriod: TimeSpan.FromSeconds(30), timeProvider: timeProvider);
+            var queue = new InMemoryPubSubQueue();
+
+            var parkedItem = Serialize(new PlayerCoreUpdatedEvent(player.Id, 9, 100, 0, 100, 100, DateTime.UtcNow, false, null));
+            await queue.AddToQueueAsync(parkedItem);
+            await synchronizer.ProcessQueue(queue);
+            Assert.Single(await queue.PeekProcessingAsync(10));
+
+            // Another instance reclaims and applies the parked item, acknowledging it off the shared processing
+            // list. A pass with nothing new to reserve then observes the list empty, which is the second
+            // documented release condition — and the better one, since it needs no grace period.
+            await queue.AcknowledgeAsync(parkedItem);
+            togglingServices.ShouldFail = false;
+            await synchronizer.ProcessQueue(queue);
+            Assert.Empty(await queue.PeekProcessingAsync(10));
+
+            // So the player's next event applies on the very next pass, with no time advanced at all: if the
+            // block were only released by the reclaim, this would defer and leave the row untouched.
+            await queue.AddToQueueAsync(Serialize(new PlayerCoreUpdatedEvent(player.Id, 10, 150, 0, 100, 100, DateTime.UtcNow, false, null)));
+            await synchronizer.ProcessQueue(queue);
+
+            Assert.Empty(await queue.PeekProcessingAsync(10));
+            Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("stranded"));
             Assert.Empty(await DrainDeadLetterQueue(pubsub));
 
             using var verifyScope = CreateScope();
