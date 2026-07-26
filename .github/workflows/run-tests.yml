@@ -36,6 +36,7 @@ jobs:
       frontend: ${{ steps.filter.outputs.frontend }}
       csproj: ${{ steps.filter.outputs.csproj }}
       hooks: ${{ steps.filter.outputs.hooks }}
+      buildScripts: ${{ steps.filter.outputs.buildScripts }}
     steps:
     - name: Checkout
       uses: actions/checkout@v7
@@ -81,6 +82,9 @@ jobs:
           hooks:
             - '.claude/hooks/**'
             - '.github/workflows/**'
+          buildScripts:
+            - 'build/**'
+            - '.github/workflows/**'
 
   # Guards against a known dependabot-core artifact under Central Package Management: rebasing a
   # NuGet version-bump PR (because another PR touched Directory.Packages.props first) can make
@@ -120,6 +124,25 @@ jobs:
 
     - name: Run session-start hook tests
       run: bash .claude/hooks/session-start.test.sh
+
+  # The build/ PowerShell scripts gate CI on coverage, and a subtly wrong aggregation there doesn't
+  # crash — it reports a plausible number and keeps passing. Their tests use synthetic report
+  # fixtures, so this needs no build, no .NET and no backing services; pwsh is preinstalled on the
+  # runner image.
+  test-build-scripts:
+    needs: [detect-changes]
+    if: |
+      always() && !cancelled() &&
+      (github.event_name == 'push' || needs.detect-changes.outputs.buildScripts == 'true')
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+
+    - name: Run coverage tooling tests
+      shell: pwsh
+      run: ./build/coverage.test.ps1
 
   # Non-test backend verifications (codegen drift + formatter), split out of test-backend so that
   # job is left with just build + tests/coverage (its longest path). Both checks need the build, so
@@ -428,7 +451,7 @@ jobs:
     # skipped (path-filtered out); fails if any job failed or was cancelled, including
     # detect-changes itself (a change-detection failure should block the PR, not silently skip tests).
     if: always()
-    needs: [detect-changes, guard-dependabot-csproj-scope, test-hooks, verify-backend, verify-frontend, test-backend, test-frontend, test-e2e]
+    needs: [detect-changes, guard-dependabot-csproj-scope, test-hooks, test-build-scripts, verify-backend, verify-frontend, test-backend, test-frontend, test-e2e]
     runs-on: ubuntu-latest
     steps:
     - name: Verify all jobs passed or were skipped

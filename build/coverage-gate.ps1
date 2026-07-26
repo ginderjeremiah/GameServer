@@ -40,7 +40,7 @@ $floors = Get-Content $FloorsPath -Raw | ConvertFrom-Json
 $byName = @{}
 foreach ($a in $summary.coverage.assemblies) { $byName[$a.name] = $a }
 
-$gatedNames = @($floors.gated.PSObject.Properties.Name)
+$gatedNames = Get-FloorSectionNames $floors.gated
 $failures = New-Object System.Collections.Generic.List[string]
 $rows = New-Object System.Collections.Generic.List[object]
 
@@ -78,8 +78,7 @@ foreach ($name in $gatedNames) {
 
 # Gated namespace sub-areas: a logic-heavy slice of an otherwise measure-only assembly, gated on the
 # coverage aggregated from its per-class entries.
-$gatedNsNames = @()
-if ($null -ne $floors.gatedNamespaces) { $gatedNsNames = @($floors.gatedNamespaces.PSObject.Properties.Name) }
+$gatedNsNames = Get-FloorSectionNames $floors.gatedNamespaces
 foreach ($name in $gatedNsNames) {
   $entry = $floors.gatedNamespaces.$name
   $a = $byName[$entry.assembly]

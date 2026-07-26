@@ -48,26 +48,15 @@ $floors = Get-Content $FloorsPath -Raw | ConvertFrom-Json
 $byName = @{}
 foreach ($a in $summary.coverage.assemblies) { $byName[$a.name] = $a }
 
-# Exact percentage from raw counts, margin subtracted, floored to a whole percent — never a
-# fractional floor, matching the style already hand-written into coverage-floors.json.
-function Get-SuggestedFloor($covered, $total, $marginPoints) {
-  if ($null -eq $total -or $total -eq 0) { return $null }
-  $actual = 100.0 * $covered / $total
-  $suggested = [math]::Floor($actual - $marginPoints)
-  if ($suggested -lt 0) { $suggested = 0 }
-  return [pscustomobject]@{ Actual = $actual; Suggested = $suggested }
-}
-
 function Show-Suggestion($label, $currentFloor, $metric) {
   if ($null -eq $metric) { return }
-  $arrow = if ($metric.Suggested -gt $currentFloor) { '(raise)' } elseif ($metric.Suggested -lt $currentFloor) { '(below current — keep existing, ratchet only rises)' } else { '(no change)' }
-  $kept = [math]::Max($currentFloor, $metric.Suggested)
-  Write-Host ("  {0,-10} actual {1,7:N4}%  current floor {2,3}  suggested {3,3}  -> {4,3} {5}" -f $label, $metric.Actual, $currentFloor, $metric.Suggested, $kept, $arrow)
+  $ratchet = Get-FloorRatchet $currentFloor $metric.Suggested
+  Write-Host ("  {0,-10} actual {1,7:N4}%  current floor {2,3}  suggested {3,3}  -> {4,3} ({5})" -f $label, $metric.Actual, $currentFloor, $metric.Suggested, $ratchet.Kept, $ratchet.Label)
 }
 
 Write-Host ""
 Write-Host "Gated assemblies (margin ${MarginPoints}pt):" -ForegroundColor Cyan
-foreach ($name in @($floors.gated.PSObject.Properties.Name)) {
+foreach ($name in (Get-FloorSectionNames $floors.gated)) {
   $floor = $floors.gated.$name
   $a = $byName[$name]
   if ($null -eq $a) {
@@ -81,10 +70,11 @@ foreach ($name in @($floors.gated.PSObject.Properties.Name)) {
   }
 }
 
-if ($null -ne $floors.gatedNamespaces) {
+$gatedNsNames = Get-FloorSectionNames $floors.gatedNamespaces
+if ($gatedNsNames.Count -gt 0) {
   Write-Host ""
   Write-Host "Gated namespaces (margin ${MarginPoints}pt):" -ForegroundColor Cyan
-  foreach ($name in @($floors.gatedNamespaces.PSObject.Properties.Name)) {
+  foreach ($name in $gatedNsNames) {
     $entry = $floors.gatedNamespaces.$name
     $a = $byName[$entry.assembly]
     if ($null -eq $a) {
