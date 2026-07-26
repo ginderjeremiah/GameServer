@@ -72,9 +72,9 @@ namespace Game.Api.Tests.Unit
         [Fact]
         public async Task ReloadSession_StoreHasNoSession_DiscardsTheStaleBoundState()
         {
-            // LoadPlayerState keeps whatever is bound on a cache miss, so a forced reload has to drop the old
-            // state itself — otherwise an evicted session would silently leave the very snapshot this reload
-            // exists to discard in place.
+            // LoadPlayerState keeps whatever is bound on a cache miss, so the reload keys on the reported miss
+            // rather than on what ends up bound — otherwise an evicted session would be indistinguishable
+            // from a hit matching the very snapshot this reload exists to discard, and silently keep it.
             var (store, session, initializer) = CreateInitializer();
             store.Session = ActiveBattleState();
             await initializer.EnsureSessionLoaded();

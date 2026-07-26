@@ -38,8 +38,9 @@ namespace Game.Api.Tests.Unit
             var session = new SessionService(store);
             session.SetAuthenticatedUser(5);
 
-            await session.LoadPlayerState();
+            var loaded = await session.LoadPlayerState();
 
+            Assert.True(loaded);
             Assert.True(session.HasPlayerSession);
             Assert.Equal(7, session.SelectedPlayerId);
         }
@@ -52,8 +53,11 @@ namespace Game.Api.Tests.Unit
             var session = new SessionService(new FakeSessionStore());
             session.SetAuthenticatedUser(5);
 
-            await session.LoadPlayerState();
+            var loaded = await session.LoadPlayerState();
 
+            // The reported miss is what lets SessionInitializer tell "the store had nothing" apart from "the
+            // store served exactly what was already bound", which the kept state alone cannot distinguish.
+            Assert.False(loaded);
             Assert.True(session.Authenticated);
             Assert.False(session.HasPlayerSession);
             Assert.Equal(0, session.SelectedPlayerId);
@@ -283,6 +287,5 @@ namespace Game.Api.Tests.Unit
 
             Assert.Empty(store.Cleared);
         }
-
     }
 }

@@ -58,20 +58,16 @@ namespace Game.Api.Services
                 return;
             }
 
-            if (forceReload)
-            {
-                // Drop the currently-bound state up front: LoadPlayerState keeps what is already bound when
-                // the store has nothing, so without this a cache miss would silently leave the very snapshot
-                // this reload exists to discard in place.
-                _sessionService.RehydrateSession(selectedPlayerId);
-            }
-            else if (_sessionService.HasPlayerSession && _sessionService.SelectedPlayerId == selectedPlayerId)
+            if (!forceReload && _sessionService.HasPlayerSession && _sessionService.SelectedPlayerId == selectedPlayerId)
             {
                 return;
             }
 
-            await _sessionService.LoadPlayerState(cancellationToken);
-            if (_sessionService.HasPlayerSession && _sessionService.SelectedPlayerId == selectedPlayerId)
+            // Keyed on what the store actually served, not on what is bound afterwards: LoadPlayerState keeps
+            // the currently-bound state on a miss, so a forced reload that read nothing would otherwise look
+            // indistinguishable from a hit matching the snapshot it was called to discard.
+            var loaded = await _sessionService.LoadPlayerState(cancellationToken);
+            if (loaded && _sessionService.SelectedPlayerId == selectedPlayerId)
             {
                 return;
             }

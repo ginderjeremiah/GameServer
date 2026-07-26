@@ -5,9 +5,10 @@ using Game.Core;
 
 namespace Game.Api.Middleware
 {
-    public class SocketInterceptorMiddleware(RequestDelegate next)
+    public class SocketInterceptorMiddleware(RequestDelegate next, ILogger<SocketInterceptorMiddleware> logger)
     {
         private readonly RequestDelegate _next = next;
+        private readonly ILogger<SocketInterceptorMiddleware> _logger = logger;
 
         /// <summary>
         /// The application request pipeline hook.
@@ -122,12 +123,18 @@ namespace Game.Api.Middleware
         /// is never observed at all, so only a read taken from inside the claim is actually guaranteed
         /// current. A player that no longer loads keeps the handshake's already-pinned aggregate — the row
         /// vanishing inside this window is pathological, and a stale pin still beats leaving the connection
-        /// with none (mirroring <c>SocketHandler</c>'s own reload-before-command handling).
+        /// with none (mirroring <c>SocketHandler</c>'s own reload-before-command handling) — but it is warned
+        /// about, since that connection is knowingly going live on a pin taken outside the claim.
         /// </summary>
-        private static async Task ReloadSession(SessionService sessionService, SessionInitializer sessionInitializer, IServiceScopeFactory scopeFactory, CancellationToken cancellationToken)
+        private async Task ReloadSession(SessionService sessionService, SessionInitializer sessionInitializer, IServiceScopeFactory scopeFactory, CancellationToken cancellationToken)
         {
             await sessionInitializer.ReloadSession(cancellationToken);
-            await TryPinPlayer(sessionService, scopeFactory, cancellationToken);
+            if (!await TryPinPlayer(sessionService, scopeFactory, cancellationToken))
+            {
+                _logger.LogWarning(
+                    "Player {PlayerId} could not be re-read while claiming its socket presence; keeping the pre-claim pin, which a concurrent switch-away credit may have left stale.",
+                    sessionService.SelectedPlayerId);
+            }
         }
 
         /// <summary>

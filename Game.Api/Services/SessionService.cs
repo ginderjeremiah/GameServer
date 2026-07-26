@@ -55,18 +55,23 @@ namespace Game.Api.Services
         }
 
         /// <summary>
-        /// Loads the authenticated user's in-flight player state from the session store. A cache miss leaves
-        /// <see cref="HasPlayerSession"/> false so the caller can rehydrate it (see
-        /// <see cref="SessionInitializer"/>). Only invoked where a consumer actually needs the *token's own*
+        /// Loads the authenticated user's in-flight player state from the session store, reporting whether
+        /// one was found. A cache miss leaves whatever is already bound in place (and so leaves
+        /// <see cref="HasPlayerSession"/> false on a first load) for the caller to rehydrate — the returned
+        /// flag is what lets <see cref="SessionInitializer"/> tell a miss apart from a hit that happens to
+        /// match the state it already held. Only invoked where a consumer actually needs the *token's own*
         /// player state (the socket handshake and the Status auth endpoint), never on every HTTP request.
         /// </summary>
-        public async Task LoadPlayerState(CancellationToken cancellationToken = default)
+        public async Task<bool> LoadPlayerState(CancellationToken cancellationToken = default)
         {
             var sessionData = await _sessionStore.GetSession(UserId, cancellationToken);
-            if (sessionData is not null)
+            if (sessionData is null)
             {
-                PlayerState = sessionData;
+                return false;
             }
+
+            PlayerState = sessionData;
+            return true;
         }
 
         /// <summary>

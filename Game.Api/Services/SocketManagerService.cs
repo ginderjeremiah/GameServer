@@ -100,6 +100,12 @@ namespace Game.Api.Services
         /// read-modify-write can still land and leave the read stale; after the loops start, replacing the
         /// pinned aggregate would swap it under a running command. A fault here rolls the registration back
         /// like any other, rather than leaving a live socket bound to state read outside the claim.
+        /// <para>
+        /// It may replace the pinned state but must not change the session's <em>selected player</em>: this
+        /// registration's identity — the presence key, the account slot, and <see cref="SocketContext.PlayerId"/>
+        /// — is captured before it runs, so binding to a different character here would leave every one of
+        /// them naming a player the connection is no longer pinned to.
+        /// </para>
         /// </param>
         public async Task<SocketContext> RegisterSocket(WebSocket socket, SessionService sessionService, bool isAdmin, Func<Task> onPresenceClaimed)
         {
