@@ -18,13 +18,14 @@ $ErrorActionPreference = 'Stop'
 # Don't let native-command non-zero exits throw under PS7's opt-in behaviour; we steer on $LASTEXITCODE
 # so a failing test run still produces a report before we surface the failure. (No-op on 5.1.)
 $PSNativeCommandUseErrorActionPreference = $false
+. (Join-Path $PSScriptRoot 'coverage-lib.ps1')
 
 # dotnet-coverage runs `dotnet test` as a profiled child and relays only its summary lines, so a red
 # run names a TestResults log rather than the test that failed. Print that detail where whoever is
 # reading a failing job already is. Each test project writes one UTF-16 log under its
-# bin/<config>/<tfm>/TestResults/; the signal is the `failed <test>` blocks and the run summary, so
-# the periodic `[+n/xn/?n]` progress lines and blank padding are dropped. Only runs *proven* green
-# are skipped, so a crashed or truncated run still gets printed rather than silently swallowed.
+# bin/<config>/<tfm>/TestResults/. Only runs *proven* green are skipped, so a crashed or truncated
+# run still gets printed rather than silently swallowed; the log-content decisions themselves live in
+# coverage-lib.ps1 so they are testable without touching disk.
 function Write-TestFailureDetail($RepoRoot) {
   $logs = @(Get-ChildItem -Path (Join-Path $RepoRoot '*/bin/*/*/TestResults/*.log') -File -ErrorAction SilentlyContinue)
   if ($logs.Count -eq 0) {
@@ -33,10 +34,10 @@ function Write-TestFailureDetail($RepoRoot) {
   }
   foreach ($log in $logs) {
     $lines = @(Get-Content $log.FullName)
-    if ($lines | Where-Object { $_ -like 'Test run summary: Passed!*' }) { continue }
+    if (Test-TestLogProvenGreen $lines) { continue }
     Write-Host ""
     Write-Host "── $($log.FullName) ──" -ForegroundColor Yellow
-    $lines | Where-Object { $_ -notmatch '^\[\+' -and $_.Trim() -ne '' } | ForEach-Object { Write-Host $_ }
+    foreach ($line in (Select-TestLogDetailLine $lines)) { Write-Host $line }
   }
 }
 
