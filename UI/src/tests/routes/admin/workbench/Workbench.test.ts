@@ -21,33 +21,30 @@ vi.mock('$stores', () => ({
 import Workbench from '$routes/admin/workbench/Workbench.svelte';
 import { workbenchDirty } from '$routes/admin/workbench/dirty.svelte';
 import type { EntityConfig, Identified } from '$routes/admin/workbench/entities/types';
+import { makeEntityConfig } from '../../../fixtures/workbench-config';
 
 const seed: Identified[] = [
 	{ id: 1, name: 'Alpha' },
 	{ id: 2, name: 'Beta' }
 ];
 
-const makeConfig = (overrides: Partial<EntityConfig<Identified>> = {}): EntityConfig<Identified> => ({
-	key: 'rows',
-	label: 'Enemies',
-	singular: 'Enemy',
-	glyph: 'box',
-	blankName: 'Unnamed',
-	newItem: (id) => ({ id, name: '' }),
-	meta: () => [],
-	sections: [
-		{
-			key: 'identity',
-			label: 'Identity',
-			glyph: 'box',
-			kind: 'fields',
-			fields: [{ key: 'name', label: 'Name', type: 'text' }]
-		}
-	],
-	refresh: async () => seed,
-	persist: async () => ({ records: [], idMap: new Map() }),
-	...overrides
-});
+const makeConfig = (overrides: Partial<EntityConfig<Identified>> = {}) =>
+	makeEntityConfig<Identified>({
+		label: 'Enemies',
+		singular: 'Enemy',
+		newItem: (id) => ({ id, name: '' }),
+		sections: [
+			{
+				key: 'identity',
+				label: 'Identity',
+				glyph: 'box',
+				kind: 'fields',
+				fields: [{ key: 'name', label: 'Name', type: 'text' }]
+			}
+		],
+		refresh: async () => seed,
+		...overrides
+	});
 
 afterEach(cleanup);
 

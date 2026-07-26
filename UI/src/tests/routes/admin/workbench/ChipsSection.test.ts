@@ -5,7 +5,8 @@ vi.mock('$stores', () => ({ toastError: vi.fn() }));
 
 import ChipsSection from '$routes/admin/workbench/components/ChipsSection.svelte';
 import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
-import type { ChipsSectionConfig, EntityConfig, Identified } from '$routes/admin/workbench/entities/types';
+import type { ChipsSectionConfig, Identified } from '$routes/admin/workbench/entities/types';
+import { makeEntityConfig } from '../../../fixtures/workbench-config';
 
 interface Row extends Identified {
 	skillPool: number[];
@@ -41,19 +42,7 @@ const section: ChipsSectionConfig<Row, SkillEntry> = {
 	addLabel: 'Add skill…'
 };
 
-const config = (): EntityConfig<Row> =>
-	({
-		key: 'rows',
-		label: 'Rows',
-		singular: 'Row',
-		glyph: 'box',
-		blankName: 'Unnamed',
-		newItem: (id: number) => ({ id, skillPool: [] }),
-		meta: () => [],
-		sections: [section],
-		refresh: async () => [],
-		persist: async () => []
-	}) as unknown as EntityConfig<Row>;
+const config = () => makeEntityConfig<Row>({ newItem: (id) => ({ id, skillPool: [] }), sections: [section] });
 
 const setup = (skillPool: number[]) => {
 	const store = new EntityStore(config(), [{ id: 1, skillPool }]);

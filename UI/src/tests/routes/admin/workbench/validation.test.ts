@@ -6,7 +6,8 @@ import {
 	sectionBlockingWarning,
 	sectionWarnings
 } from '../../../../routes/admin/workbench/validation';
-import type { EntityConfig, FieldConfig, Identified } from '../../../../routes/admin/workbench/entities/types';
+import type { FieldConfig, Identified, SectionConfig } from '../../../../routes/admin/workbench/entities/types';
+import { makeEntityConfig } from '../../../fixtures/workbench-config';
 
 interface Thing extends Identified {
 	id: number;
@@ -40,19 +41,22 @@ describe('fieldWarn', () => {
 	});
 });
 
-const entity = {
+/* Only the fields/non-fields split matters to these helpers — a `fields` section warns per required
+   field, everything else warns solely through its `warn` predicate — so the non-field sections here are
+   the `usage` kind, which carries a `warn` without a table's row plumbing. */
+const entity = makeEntityConfig<Thing>({
+	newItem: (id) => ({ id, name: '', icon: '', rows: [] }),
 	sections: [
 		{ key: 'identity', label: 'Identity', glyph: 'tag', kind: 'fields', fields: [nameField, iconField] },
 		{
 			key: 'rows',
 			label: 'Rows',
 			glyph: 'bars',
-			kind: 'table',
-			itemsKey: 'rows',
-			warn: (t: Thing) => (t.rows.length ? null : 'No rows')
+			kind: 'usage',
+			warn: (t) => (t.rows.length ? null : 'No rows')
 		}
 	]
-} as unknown as EntityConfig<Thing>;
+});
 
 describe('sectionWarnings', () => {
 	it('collects each failing required field in a fields section', () => {
@@ -66,14 +70,14 @@ describe('sectionWarnings', () => {
 	});
 
 	it('also surfaces a fields section warn (a cross-field rule), after its field warns', () => {
-		const section = {
+		const section: SectionConfig<Thing> = {
 			key: 'identity',
 			label: 'Identity',
 			glyph: 'tag',
 			kind: 'fields',
 			fields: [nameField],
-			warn: (t: Thing) => (t.icon ? null : 'No icon set')
-		} as unknown as EntityConfig<Thing>['sections'][number];
+			warn: (t) => (t.icon ? null : 'No icon set')
+		};
 		// Both the failing required field and the section warn surface, field warns first.
 		expect(sectionWarnings(section, { id: 1, name: '', icon: '', rows: [] })).toEqual(['Missing name', 'No icon set']);
 		// Section warn alone when the required field passes.
@@ -83,17 +87,15 @@ describe('sectionWarnings', () => {
 	});
 
 	it('passes the baseline through to the warn predicate', () => {
-		const section = {
+		const section: SectionConfig<Thing> = {
 			key: 'rows',
 			label: 'Rows',
 			glyph: 'bars',
-			kind: 'table',
-			itemsKey: 'rows',
+			kind: 'usage',
 			// Mirrors zone.ts's isHome gap: the pending record alone can't tell whether this is a
 			// same-save clear, only comparing against the persisted baseline can.
-			warn: (t: Thing, baseline: Thing | undefined) =>
-				!t.rows.length && baseline?.rows.length ? 'Cleared this save' : null
-		} as unknown as EntityConfig<Thing>['sections'][number];
+			warn: (t, baseline) => (!t.rows.length && baseline?.rows.length ? 'Cleared this save' : null)
+		};
 		const rec = { id: 1, name: 'x', icon: 'x', rows: [] };
 		expect(sectionWarnings(section, rec)).toEqual([]);
 		expect(sectionWarnings(section, rec, { id: 1, name: 'x', icon: 'x', rows: [] })).toEqual([]);
@@ -116,23 +118,21 @@ describe('entityWarnings', () => {
 });
 
 describe('sectionBlockingWarning', () => {
-	const blockingSection = {
+	const blockingSection: SectionConfig<Thing> = {
 		key: 'rows',
 		label: 'Rows',
 		glyph: 'bars',
-		kind: 'table',
-		itemsKey: 'rows',
-		warn: (t: Thing) => (t.rows.length ? null : { message: 'No rows', blocking: true })
-	} as unknown as EntityConfig<Thing>['sections'][number];
+		kind: 'usage',
+		warn: (t) => (t.rows.length ? null : { message: 'No rows', blocking: true })
+	};
 
-	const advisorySection = {
+	const advisorySection: SectionConfig<Thing> = {
 		key: 'rows',
 		label: 'Rows',
 		glyph: 'bars',
-		kind: 'table',
-		itemsKey: 'rows',
-		warn: (t: Thing) => (t.rows.length ? null : 'No rows')
-	} as unknown as EntityConfig<Thing>['sections'][number];
+		kind: 'usage',
+		warn: (t) => (t.rows.length ? null : 'No rows')
+	};
 
 	it('returns the message when the warn is flagged blocking', () => {
 		expect(sectionBlockingWarning(blockingSection, { id: 1, name: 'x', icon: 'x', rows: [] })).toBe('No rows');
@@ -147,32 +147,32 @@ describe('sectionBlockingWarning', () => {
 	});
 
 	it('a fields section warn can also be flagged blocking, independent of its required-field warnings', () => {
-		const section = {
+		const section: SectionConfig<Thing> = {
 			key: 'identity',
 			label: 'Identity',
 			glyph: 'tag',
 			kind: 'fields',
 			fields: [nameField],
-			warn: (t: Thing) => (t.icon ? null : { message: 'No icon set', blocking: true })
-		} as unknown as EntityConfig<Thing>['sections'][number];
+			warn: (t) => (t.icon ? null : { message: 'No icon set', blocking: true })
+		};
 		expect(sectionBlockingWarning(section, { id: 1, name: '', icon: '', rows: [] })).toBe('No icon set');
 	});
 });
 
 describe('entityBlockingWarnings', () => {
-	const mixedEntity = {
+	const mixedEntity = makeEntityConfig<Thing>({
+		newItem: (id) => ({ id, name: '', icon: '', rows: [] }),
 		sections: [
 			{ key: 'identity', label: 'Identity', glyph: 'tag', kind: 'fields', fields: [nameField, iconField] },
 			{
 				key: 'rows',
 				label: 'Rows',
 				glyph: 'bars',
-				kind: 'table',
-				itemsKey: 'rows',
-				warn: (t: Thing) => (t.rows.length ? null : { message: 'No rows', blocking: true })
+				kind: 'usage',
+				warn: (t) => (t.rows.length ? null : { message: 'No rows', blocking: true })
 			}
 		]
-	} as unknown as EntityConfig<Thing>;
+	});
 
 	it('only collects the blocking warnings, skipping required-field (always advisory) warnings', () => {
 		expect(entityBlockingWarnings(mixedEntity, { id: 1, name: '', icon: '', rows: [] })).toEqual(['No rows']);
