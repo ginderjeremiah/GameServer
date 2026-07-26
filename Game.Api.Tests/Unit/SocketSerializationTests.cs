@@ -54,7 +54,7 @@ namespace Game.Api.Tests.Unit
             // A minimal in-memory provider: the executed GetStatisticTypes command needs no dependency, but
             // SocketHandler.RunCommand commits an IUnitOfWork from each work scope.
             await using var provider = new ServiceCollection()
-                .AddScoped<IUnitOfWork, NoOpUnitOfWork>()
+                .AddScoped<IUnitOfWork, FakeUnitOfWork>()
                 .BuildServiceProvider();
 
             var session = new SessionService(new FakeSessionStore());

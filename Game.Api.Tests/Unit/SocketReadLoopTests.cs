@@ -29,7 +29,7 @@ namespace Game.Api.Tests.Unit
         public SocketReadLoopTests()
         {
             _provider = new ServiceCollection()
-                .AddScoped<IUnitOfWork, NoOpUnitOfWork>()
+                .AddScoped<IUnitOfWork, FakeUnitOfWork>()
                 .BuildServiceProvider();
             _scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
             _loggerFactory = LoggerFactory.Create(b => b.AddProvider(_logs).SetMinimumLevel(LogLevel.Trace));

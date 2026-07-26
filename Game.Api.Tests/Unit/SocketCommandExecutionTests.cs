@@ -34,7 +34,7 @@ namespace Game.Api.Tests.Unit
         public SocketCommandExecutionTests()
         {
             _provider = new ServiceCollection()
-                .AddScoped<IUnitOfWork, NoOpUnitOfWork>()
+                .AddScoped<IUnitOfWork, FakeUnitOfWork>()
                 .BuildServiceProvider();
             _scopeFactory = _provider.GetRequiredService<IServiceScopeFactory>();
             _loggerFactory = LoggerFactory.Create(b => b.AddProvider(_logs).SetMinimumLevel(LogLevel.Trace));
@@ -269,7 +269,7 @@ namespace Game.Api.Tests.Unit
             var reloadedPlayer = new PlayerBuilder().WithId(1).Build();
             var playerRepo = new FakePlayerRepository(reloadedPlayer);
             using var provider = new ServiceCollection()
-                .AddScoped<IUnitOfWork, NoOpUnitOfWork>()
+                .AddScoped<IUnitOfWork, FakeUnitOfWork>()
                 .AddScoped<IPlayerRepository>(_ => playerRepo)
                 .BuildServiceProvider();
 
@@ -304,7 +304,7 @@ namespace Game.Api.Tests.Unit
             var reloadedPlayer = new PlayerBuilder().WithId(1).Build();
             var playerRepo = new FakePlayerRepository(reloadedPlayer);
             using var provider = new ServiceCollection()
-                .AddScoped<IUnitOfWork, NoOpUnitOfWork>()
+                .AddScoped<IUnitOfWork, FakeUnitOfWork>()
                 .AddScoped<IPlayerRepository>(_ => playerRepo)
                 .BuildServiceProvider();
 
@@ -347,7 +347,7 @@ namespace Game.Api.Tests.Unit
             var reloadedPlayer = new PlayerBuilder().WithId(1).Build();
             var playerRepo = new FakePlayerRepository(null, reloadedPlayer);
             using var provider = new ServiceCollection()
-                .AddScoped<IUnitOfWork, NoOpUnitOfWork>()
+                .AddScoped<IUnitOfWork, FakeUnitOfWork>()
                 .AddScoped<IPlayerRepository>(_ => playerRepo)
                 .BuildServiceProvider();
 
@@ -385,7 +385,7 @@ namespace Game.Api.Tests.Unit
             // #2174: the unit-of-work commit must observe the same per-command budget as ExecuteAsync — a
             // flush that itself wedges past the timeout must be cancellable rather than riding out Npgsql's
             // own command timeout, mirroring CommitFilter's HTTP-side behavior (which passes RequestAborted).
-            var unitOfWork = new CapturingUnitOfWork();
+            var unitOfWork = new FakeUnitOfWork();
             using var provider = new ServiceCollection()
                 .AddScoped<IUnitOfWork>(_ => unitOfWork)
                 .BuildServiceProvider();
@@ -401,8 +401,8 @@ namespace Game.Api.Tests.Unit
 
             // A token backed by a real CancellationTokenSource reports CanBeCanceled; the prior default-token
             // call (CancellationToken.None) would not, so this fails without the fix.
-            Assert.NotNull(unitOfWork.ReceivedToken);
-            Assert.True(unitOfWork.ReceivedToken!.Value.CanBeCanceled);
+            Assert.Equal(1, unitOfWork.CommitCount);
+            Assert.True(unitOfWork.LastToken.CanBeCanceled);
         }
 
         private (FakeWebSocket Socket, SocketHandler Handler) CreateHandler(Func<string, Exception?> throwOn, Func<string, Exception?>? throwOnCreate = null, Func<string, bool>? selfDelivering = null)
@@ -501,17 +501,6 @@ namespace Game.Api.Tests.Unit
                 await context.SendData(Success());
                 await context.Close(ESocketCloseReason.SocketReplaced);
                 return Success();
-            }
-        }
-
-        private sealed class CapturingUnitOfWork : IUnitOfWork
-        {
-            public CancellationToken? ReceivedToken { get; private set; }
-
-            public Task CommitAsync(CancellationToken cancellationToken = default)
-            {
-                ReceivedToken = cancellationToken;
-                return Task.CompletedTask;
             }
         }
 
