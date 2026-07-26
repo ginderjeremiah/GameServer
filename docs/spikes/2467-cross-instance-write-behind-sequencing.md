@@ -59,7 +59,11 @@ timing, not on cost. Reservation is sequential and the park happens only *after*
 exhausted (~0.6s by default), so `E2` is reserved **and applied** by B before A ever sets the marker. To
 close the window the marker would have to be claimed at *reserve* time (a fleet-wide per-player in-flight
 lock, atomic with the `LMOVE`), which reintroduces exactly the same-player cross-fleet serialization
-`#1701` set out to relax and still leaves the marker to leak on a crash. **Sequencing is not merely the
+`#1701` set out to relax and still leaves the marker to leak on a crash. To be fair to the mechanism: a
+fleet-shared marker would still block every same-player event reserved *after* the park, which is most of a
+long outage — it narrows the window rather than doing nothing, and that matters for #2475, which retires the
+instance-local marker because the guard makes it redundant, not because it never protected anything.
+**Sequencing is not merely the
 "obvious shape" — it is the only shape that is correct by construction**, because it makes the guard depend
 on the events' own relative age rather than on any instance observing another's state in time.
 
@@ -83,6 +87,15 @@ Rejected alternatives:
 The aggregate is the natural owner because **a player has exactly one live socket**, so the producer side
 needs no distributed coordination at all — only the consumer side interleaves.
 
+**The counter lives on the `Game.Core` aggregate, not in the data tier.** `backend.md` keeps persistence
+detail out of `Game.Core`, so this is worth naming rather than leaving to #2473 to argue from scratch. The
+precedent is `PlayerProgress`, which already carries write-behind plumbing in the domain
+(`_dirtyStatistics`/`_dirtyChallenges`/`_dirtyProficiencies` and their `Dirty*` projections); a counter
+beside them is consistent. `Player` carries nothing comparable, so it does gain its first write-behind-queue
+concern. The alternative — keeping the counter entirely in the data tier — has no home to live in: it would
+need a connection-scoped holder that the per-command DI scope doesn't provide, the same dependency the
+progress aggregate declined to invert for its per-battle reload.
+
 **Separate sequences per aggregate, not one shared.** The player and progress aggregates are separate
 enqueues, ordered independently today, and write disjoint tables. Sharing one counter would mean threading
 it between two repositories for zero benefit; two independent sequence spaces never interact because their
@@ -95,7 +108,11 @@ later applied out of order the older one is correctly rejected rather than winni
 
 **All events of one save share one sequence.** The guard therefore has to reject on `<` (strictly older),
 never `<=`: same-sequence siblings must all apply, and a duplicate re-apply of the same event must stay
-idempotent under the queue's at-least-once contract.
+idempotent under the queue's at-least-once contract. The consequence is that **the guard imposes no
+ordering *within* a save** — despite the "per-player sequencing" framing, it is not a total order. Two
+same-save events touching the same target still apply in whatever order the drain hands them over, exactly
+as today. That is the right place to stop: a save's events are all raised from one consistent aggregate
+state, so any order of them lands the same end state.
 
 **Plumbing.** `Sequence` goes on `DomainEventEnvelope` (defaulted, exactly like `Id` — so an envelope
 enqueued by a pre-upgrade instance mid-rolling-deploy still deserializes and simply carries sequence 0),
@@ -105,8 +122,48 @@ positional parameter.
 
 ### 2. Where the watermark lives — one generic table, granularity chosen per stream
 
-`PlayerWriteWatermark(PlayerId, Stream, TargetKey, LastAppliedSequence)`, upserted inside the guarded
-handler's own `SaveChangesAsync` (no extra round trip).
+`PlayerWriteWatermark(PlayerId, Stream, TargetKey, LastAppliedSequence)`.
+
+**The compare must *be* the write, and the load-bearing mechanic is that the watermark row becomes the
+per-target serialization point.** A read-then-compare-then-apply does not survive the very race this spike
+exists to fix: two instances applying the same player's events concurrently both read
+`LastAppliedSequence` = 4, both pass their guard, and under `READ COMMITTED` whichever commits last wins
+the data row — which can be the older event. The guard is therefore a **conditional** statement,
+
+```sql
+UPDATE "PlayerWriteWatermark" SET "LastAppliedSequence" = @seq
+WHERE "PlayerId" = @p AND "Stream" = @s AND "TargetKey" = @k AND "LastAppliedSequence" < @seq
+```
+
+taking the row lock first, with the data write applied only when it reports rows-affected > 0, and both in
+one transaction. A missing watermark row is an insert-if-missing before the conditional update (or an
+`INSERT … ON CONFLICT DO UPDATE … WHERE`), so a first-ever write for a target isn't rejected.
+
+**That transaction is a new pattern on this path, and it is the real cost of the design — not a free
+round-trip ride.** An earlier draft of this doc claimed the watermark upsert costs nothing because it rides
+the handler's existing `SaveChangesAsync`. That is wrong for much of the handler set:
+`ItemUnequippedHandler` and `ModRemovedHandler` are a bare `ExecuteUpdateAsync`/`ExecuteDeleteAsync` with
+no `SaveChangesAsync` to ride at all, `LogPreferenceChangedHandler` and `LessonReadHandler` self-commit
+their update fast path, `ItemEquippedHandler` is explicit that its vacate and place are separate commits,
+and no handler on this path opens a transaction today (`BeginTransactionAsync` appears only in
+`Repositories/Users.cs` and `ContentSeeder`). Worse, a conditional watermark update is an `ExecuteUpdate`,
+which self-commits *outside* EF's implicit `SaveChanges` transaction — so even the handlers that do have a
+`SaveChangesAsync` cannot simply enlist the watermark into it.
+
+Left in separate commits, a crash between the watermark advance and the data write would advance the
+watermark without the data, and the redelivered event would then be **rejected as stale — a silently lost
+write, strictly worse than the bug being fixed**. So every guarded handler needs an explicit transaction
+(or a single-statement CTE doing both). Two knock-on effects for #2474: the existing bespoke
+unique-violation retries can no longer just `ChangeTracker.Clear()` and re-run, because a `DbUpdateException`
+aborts the surrounding transaction — they must roll back and restart it; and `ItemEquippedHandler`'s
+documented vacate/place crash window closes as a side effect, which is an improvement but invalidates the
+reasoning in its current comment.
+
+This is the price of one guard mechanism instead of two. Per-row version columns would let the
+single-row handlers do it in one atomic conditional statement with no transaction at all — but they don't
+survive `ModRemovedHandler`'s tombstone (below), so taking that cheaper path means shipping both
+mechanisms. The drain is off the player's request path, so paying transaction framing here is the right
+trade.
 
 **A single "last applied sequence" per player — the issue's first suggested fork — is wrong, and this is
 the most important finding of the spike.** The guard's granularity must be at least as fine as the row
@@ -128,17 +185,30 @@ six-plus affected tables because:
 - One migration, not six, and it never widens `Player` — a row read on effectively every socket command.
 - Granularity becomes a per-handler decision rather than a schema commitment.
 
-Its honest costs: one extra upsert per guarded event, and a row count that grows with a player's distinct
-write targets (bounded by the guarded data itself). If the owner prefers strongly-typed per-row columns,
-that is a defensible alternative — but it must then solve the `AppliedMod` tombstone explicitly, e.g. by
-keeping the mod stream on a watermark row anyway.
+Its honest costs: one conditional statement plus transaction framing per guarded event (above), and a row
+count that grows with a player's distinct write targets (bounded by the guarded data itself).
 
-**A vacated row must be stamped too.** `ItemEquippedHandler` clears the destination slot's previous
-occupant as a side effect of an absolute "item I is in slot S" statement. That eviction has to advance the
-evicted target's watermark as well, or replaying the older equip that put it there will find its watermark
-untouched, apply, and produce two items in one slot — tripping the partial unique index and cascading into
-the equip handler's vacate-retry. Every row a guarded handler writes, **including ones it only clears**,
-carries the stamp.
+**Equipment needs two keys checked, not a stamp on the vacated row.** `ItemEquippedHandler` clears the
+destination slot's previous occupant as a side effect of an absolute "item I is in slot S" statement, and
+the naive requirement — advance the *evicted* target's watermark too — collides head-on with a property
+that handler deliberately has: the vacate is a single `ExecuteUpdateAsync` precisely so the prior occupant
+is never materialized into a snapshot a concurrent commit could tear. Stamping the evicted target needs its
+`ItemId`, which `ExecuteUpdate` cannot return, forcing either a read-then-write (giving back exactly the
+tearable snapshot that comment defends against) or raw SQL with `UPDATE … RETURNING`.
+
+Neither is necessary. Key the equipment stream on **both** the item and the slot, checking and advancing
+`(item=I)` and `(slot=S)` together, and the eviction needs no stamp at all:
+
+- `seq 5`: A→slot1 advances `item=A` and `slot1` to 5.
+- `seq 6`: B→slot1 advances `item=B` and `slot1` to 6, vacating A's row without stamping it.
+- Replay of `seq 5`: passes the `item=A` check (still 5, and the guard rejects only on strictly-older), but
+  `slot1` is 6 → **rejected**. No double-occupancy, no unique-index trip.
+
+The item key is what catches the mirror case a slot key alone misses — a later save moving A from slot1 to
+slot2 leaves `slot1` untouched, so only `item=A` being at the newer sequence stops a replayed `A→slot1`
+from dragging it back. Both keys are needed; either alone has a hole. The cost is two watermark rows locked
+per equip, so #2474 must lock them in a deterministic order (item then slot) to avoid deadlocking two
+concurrent equips against each other.
 
 ### 3. How a stale event is disposed of — acknowledged, counted, and surfaced
 
