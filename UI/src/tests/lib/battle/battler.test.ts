@@ -388,6 +388,85 @@ describe('Battler', () => {
 		});
 	});
 
+	describe('offense compositions', () => {
+		// effectiveCriticalChance = the firing skill's authored criticalChance × CriticalChanceMultiplier, and
+		// executeInvestment = ExecuteBonus × the target's missing-health fraction (#2439) — the compositions the
+		// engine reads (see resolvePlayerHit in battle-step) and the backend combat rating prices. Mirrors the
+		// backend BattlerTests EffectiveCriticalChance/ExecuteInvestment cases with the same scenarios and results.
+		it('crits at exactly 0 regardless of Luck when the skill authored no criticalChance', () => {
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.Luck, amount: 50 }] })
+			});
+
+			// A skill's criticalChance defaults to 0 (authored-only opt-in), so Luck only lifts the (idle) multiplier.
+			expect(battler.effectiveCriticalChance(0)).toBeCloseTo(0, 10);
+		});
+
+		it("scales a skill's authored criticalChance by the Luck-amplified CriticalChanceMultiplier", () => {
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.Luck, amount: 20 }] })
+			});
+
+			// Skill criticalChance 0.2 × CriticalChanceMultiplier (1 + 0.002·LUK(20) = 1.04) = 0.208.
+			expect(battler.effectiveCriticalChance(0.2)).toBeCloseTo(0.2 * (1 + 0.002 * 20), 10);
+		});
+
+		it("passes a skill's authored criticalChance through verbatim when Luck is zero (base multiplier)", () => {
+			const battler = new Battler({ battlerData: makeBattlerData({ attributes: [] }) });
+
+			expect(battler.effectiveCriticalChance(0.2)).toBeCloseTo(0.2, 10);
+		});
+
+		it('leaves a crit product above 1 unclamped', () => {
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.Luck, amount: 500 }] })
+			});
+
+			// Deliberately unclamped for effectiveParryChance's reason: the engine draws against [0, 1), so a
+			// product at or above 1 saturates naturally. Clamping is the backend combat rating's concern.
+			expect(battler.effectiveCriticalChance(0.8)).toBeCloseTo(1.6, 10);
+		});
+
+		it('reads effectiveCriticalChance live, reflecting a mid-battle CriticalChanceMultiplier buff', () => {
+			const battler = new Battler({ battlerData: makeBattlerData({ attributes: [] }) });
+			expect(battler.effectiveCriticalChance(0.2)).toBeCloseTo(0.2, 10);
+
+			// A +1.0 buff lands on the base 1.0 multiplier, doubling the composed chance to 0.4.
+			battler.applyEffect(
+				makeEffect(2, ESkillEffectTarget.Self, EAttribute.CriticalChanceMultiplier, EModifierType.Additive, 1, 1000)
+			);
+
+			expect(battler.effectiveCriticalChance(0.2)).toBeCloseTo(0.4, 10);
+		});
+
+		it('invests exactly 0 execute at any missing health with no ExecuteBonus enabler', () => {
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.Strength, amount: 50 }] })
+			});
+
+			// ExecuteBonus is authored-only and idles at 0, so an un-enabled build invests nothing even against
+			// a nearly-dead target — its multiplier stays an exact 1.
+			expect(battler.executeInvestment(0.9)).toBeCloseTo(0, 10);
+		});
+
+		it('scales an authored ExecuteBonus by the missing-health fraction', () => {
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.ExecuteBonus, amount: 0.5 }] })
+			});
+
+			// ExecuteBonus 0.5 × missing-health fraction 0.75 = 0.375 (a 1.375× damage multiplier).
+			expect(battler.executeInvestment(0.75)).toBeCloseTo(0.375, 10);
+		});
+
+		it('invests 0 execute against a full-health target', () => {
+			const battler = new Battler({
+				battlerData: makeBattlerData({ attributes: [{ attributeId: EAttribute.ExecuteBonus, amount: 0.5 }] })
+			});
+
+			expect(battler.executeInvestment(0)).toBeCloseTo(0, 10);
+		});
+	});
+
 	describe('advanceCooldowns', () => {
 		it('advances skill charge time by delta * cdMultiplier', () => {
 			const battler = new Battler({

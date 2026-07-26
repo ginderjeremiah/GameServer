@@ -40,7 +40,8 @@ namespace Game.Core.Battle
     /// carries no frontend/backend parity surface. Reuses the exact <see cref="Battler"/>/<see cref="BattleSkill"/>
     /// members the engine itself uses (<see cref="BattleSkill.CalculateRawDamage"/>, <see cref="Battler.AmplifyDamage"/>,
     /// <see cref="Battler.ComputeNetDamage"/>, <see cref="Battler.GetCooldownMultiplier"/>,
-    /// <see cref="Battler.EffectiveParryChance"/>/<see cref="Battler.EffectiveDodgeChance"/>) — the anti-drift
+    /// <see cref="Battler.EffectiveParryChance"/>/<see cref="Battler.EffectiveDodgeChance"/>,
+    /// <see cref="Battler.EffectiveCriticalChance"/>, <see cref="Battler.ExecuteInvestment"/>) — the anti-drift
     /// mechanism that keeps the rating from silently diverging from the real damage pipeline.
     /// </para>
     /// <para>
@@ -80,6 +81,15 @@ namespace Game.Core.Battle
         private static double DodgeProcChance(Battler caster)
         {
             return ProcChance(caster.EffectiveDodgeChance);
+        }
+
+        // A skill's crit chance as this rating prices it: the engine's own composed product
+        // (Battler.EffectiveCriticalChance — the same member the live draw reads, so the composition cannot
+        // drift, #2439), clamped to what a draw can deliver. Takes the skill rather than a bare chance because
+        // the enabler is authored per-skill (Skill.CriticalChance, #1453), unlike the avoidance pair's attributes.
+        private static double CritProcChance(Skill skill, Battler caster)
+        {
+            return ProcChance(caster.EffectiveCriticalChance(skill.CriticalChance));
         }
 
         /// <summary>
@@ -269,14 +279,14 @@ namespace Game.Core.Battle
             // damage pipeline enforces (BattleContext.DamageTarget), so an authored enemy CriticalChance is
             // never priced as a capability that cannot fire.
             var critExpectation = isPlayer
-                ? 1.0 + ProcChance(skill.CriticalChance * effectiveCaster.GetAttributeValue(CriticalChanceMultiplier))
+                ? 1.0 + CritProcChance(skill, effectiveCaster)
                       * (effectiveCaster.GetAttributeValue(CriticalDamage) - 1.0)
                 : 1.0;
             // Enemies never execute in this engine either — ResolvePlayerHit (BattleContext.DamageTarget) is the
             // only pipeline that applies the Cull execute multiplier, so an authored enemy ExecuteBonus is never
             // priced as a capability that cannot fire (the same asymmetry as critExpectation above).
             var executeExpectation = isPlayer
-                ? 1.0 + effectiveCaster.GetAttributeValue(ExecuteBonus) * ServerGameConstants.RefMissingHealthFraction
+                ? 1.0 + effectiveCaster.ExecuteInvestment(ServerGameConstants.RefMissingHealthFraction)
                 : 1.0;
 
             return afterMitigation * critExpectation * executeExpectation;
