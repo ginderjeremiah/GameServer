@@ -118,6 +118,20 @@ export function cooldownMultiplier(attributes: BattleAttributes): number {
 	);
 }
 
+/** A hit's composed critical-hit chance: the firing skill's own authored `baseCriticalChance` — the
+ *  per-skill opt-in enabler (#1453) — scaled by the caster's CriticalChanceMultiplier. The single
+ *  definition consumed by the battle runtime (via `Battler.effectiveCriticalChance`, which delegates
+ *  here), the skill tooltip, and the skills grid, so a reshape of the composition cannot leave a display
+ *  showing a number the simulation no longer produces (#2439). Takes `BattleAttributes` rather than a
+ *  `Battler` because the display consumers only ever hold the former — the same split as
+ *  {@link cooldownMultiplier} ⇄ `Battler.cdMultiplier`. `baseCriticalChance` defaults to 0 on an
+ *  un-authored skill, so `0 × mult = 0` keeps the opt-in intact. Deliberately UNCLAMPED: the engine draws
+ *  against `[0, 1)`, which saturates naturally, and clamping is the backend combat rating's concern.
+ *  Mirrors the backend `Battler.EffectiveCriticalChance`. */
+export function effectiveCriticalChance(baseCriticalChance: number, attributes: BattleAttributes): number {
+	return baseCriticalChance * attributes.getValue(EAttribute.CriticalChanceMultiplier);
+}
+
 /** The long-run average damage multiplier from critical hits: a crit (probability `critChance`, a
  *  [0,1] value) multiplies raw damage by `critDamage` (a base-≥1 multiplier), so over many fires the
  *  expected raw damage is `raw × (1 + critChance × (critDamage − 1))`. A `critChance` of 0 (or a

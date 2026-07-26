@@ -14,9 +14,10 @@ namespace Game.Core.Tests.Battle
     /// the <see cref="Battler.TakeDamage"/> toughness-curve/death cases, the
     /// <see cref="Battler.GetCooldownMultiplier"/> formula, and the
     /// <see cref="Battler.EffectiveParryChance"/>/<see cref="Battler.EffectiveDodgeChance"/>
-    /// avoidance products are asserted here with the
+    /// avoidance products, and the <see cref="Battler.EffectiveCriticalChance"/>/
+    /// <see cref="Battler.ExecuteInvestment"/> offense compositions are asserted here with the
     /// <b>same scenarios and the same expected results</b> as the frontend, so a future
-    /// divergence in the mitigation/cadence/avoidance math fails on both sides (the same parity
+    /// divergence in the mitigation/cadence/avoidance/offense math fails on both sides (the same parity
     /// discipline used for <see cref="Mulberry32ParityTests"/> ⇄ <c>mulberry32-parity.test.ts</c>).
     /// Frontend-only concerns (skill-slot filling, render cooldowns, name/level wiring) are
     /// not part of the backend <see cref="Battler"/> and are intentionally not mirrored.
@@ -157,6 +158,95 @@ namespace Game.Core.Tests.Battle
             var battler = MakeBattler((EAttribute.DodgeChance, 0.25));
 
             Assert.Equal(0.25, battler.EffectiveDodgeChance, 10);
+        }
+
+        // ── EffectiveCriticalChance: per-skill enabler × multiplier (#2439) ──
+        // The product the engine's own crit draw reads (BattleContext.DamageTarget's player-fire half) and the
+        // combat rating prices. Unlike the avoidance pair the enabler is a per-skill authored value (#1453), so
+        // it is passed in. Mirrors the frontend battler.test.ts cases with the same scenarios and results.
+
+        [Fact]
+        public void EffectiveCriticalChance_UnauthoredSkill_IsZeroRegardlessOfLuck()
+        {
+            // A skill's CriticalChance defaults to 0 (authored-only opt-in), so Luck only lifts the (idle)
+            // multiplier: 0 × 1.1 = 0. An un-authored skill never crits.
+            var battler = MakeBattler((EAttribute.Luck, 50));
+
+            Assert.Equal(0.0, battler.EffectiveCriticalChance(0.0), 10);
+        }
+
+        [Fact]
+        public void EffectiveCriticalChance_AuthoredSkill_ScalesByLuckAmplifiedMultiplier()
+        {
+            // Skill CriticalChance 0.2 × CriticalChanceMultiplier (1 + 0.002·Luck(20) = 1.04) = 0.208.
+            var battler = MakeBattler((EAttribute.Luck, 20));
+
+            Assert.Equal(0.2 * (1 + 0.002 * 20), battler.EffectiveCriticalChance(0.2), 10);
+        }
+
+        [Fact]
+        public void EffectiveCriticalChance_AuthoredSkill_NoLuck_UsesBaseMultiplier()
+        {
+            // With no Luck the multiplier stays at its base 1, so the skill's authored chance passes through.
+            var battler = MakeBattler();
+
+            Assert.Equal(0.2, battler.EffectiveCriticalChance(0.2), 10);
+        }
+
+        [Fact]
+        public void EffectiveCriticalChance_ProductAboveOne_IsNotClamped()
+        {
+            // Deliberately unclamped for EffectiveParryChance's reason: the engine draws against [0, 1), so a
+            // product at or above 1 saturates naturally, and clamping is CombatRating's concern (it prices an
+            // expectation, not a draw). 0.8 × (1 + 0.002·500 = 2) = 1.6.
+            var battler = MakeBattler((EAttribute.Luck, 500));
+
+            Assert.Equal(1.6, battler.EffectiveCriticalChance(0.8), 10);
+        }
+
+        [Fact]
+        public void EffectiveCriticalChance_IsReadLive_ReflectingAMidBattleMultiplierChange()
+        {
+            // Read at consumption (per fire), not frozen at assembly, so a timed effect on the multiplier takes
+            // effect on the next fire — the same live-read contract as GetCooldownMultiplier.
+            var battler = MakeBattler();
+            Assert.Equal(0.2, battler.EffectiveCriticalChance(0.2), 10);
+
+            battler.ApplyEffect(CriticalChanceMultiplierBuff, CriticalChanceMultiplierBuff.Amount);
+
+            Assert.Equal(0.4, battler.EffectiveCriticalChance(0.2), 10);
+        }
+
+        // ── ExecuteInvestment: ExecuteBonus × the target's missing-health fraction (#1430/#2439) ──
+        // The composition the engine's damage multiplier and Cull overlay tally both read, and the one the
+        // combat rating prices against its reference fraction. Mirrors the frontend battler.test.ts cases.
+
+        [Fact]
+        public void ExecuteInvestment_NoEnabler_IsZeroAtAnyMissingHealth()
+        {
+            // ExecuteBonus is authored-only and idles at 0, so an un-enabled build invests nothing even against
+            // a nearly-dead target — its multiplier stays an exact 1.
+            var battler = MakeBattler((EAttribute.Strength, 50));
+
+            Assert.Equal(0.0, battler.ExecuteInvestment(0.9), 10);
+        }
+
+        [Fact]
+        public void ExecuteInvestment_AuthoredBonus_ScalesByMissingHealthFraction()
+        {
+            // ExecuteBonus 0.5 × missing-health fraction 0.75 = 0.375 (a 1.375× damage multiplier).
+            var battler = MakeBattler((EAttribute.ExecuteBonus, 0.5));
+
+            Assert.Equal(0.375, battler.ExecuteInvestment(0.75), 10);
+        }
+
+        [Fact]
+        public void ExecuteInvestment_FullHealthTarget_IsZero()
+        {
+            // At a full-health target the fraction is 0, so an authored bonus invests nothing this fire.
+            var battler = MakeBattler((EAttribute.ExecuteBonus, 0.5));
+
+            Assert.Equal(0.0, battler.ExecuteInvestment(0.0), 10);
         }
 
         // ── TakeDamage: Toughness mitigation curve ─────────────────────────────
@@ -427,6 +517,22 @@ namespace Game.Core.Tests.Battle
             Id = 1,
             Target = ESkillEffectTarget.Self,
             AttributeId = EAttribute.ParryChanceMultiplier,
+            ModifierType = EModifierType.Additive,
+            Amount = 1.0,
+            DurationMs = 1000,
+            ScalingAttributeId = EAttribute.Luck,
+            ScalingAmount = 0,
+        };
+
+        /// <summary>
+        /// A +1 additive <see cref="EAttribute.CriticalChanceMultiplier"/> buff — lands on the base 1, doubling
+        /// the composed critical-hit chance of whatever the firing skill authored.
+        /// </summary>
+        private static readonly SkillEffect CriticalChanceMultiplierBuff = new()
+        {
+            Id = 2,
+            Target = ESkillEffectTarget.Self,
+            AttributeId = EAttribute.CriticalChanceMultiplier,
             ModifierType = EModifierType.Additive,
             Amount = 1.0,
             DurationMs = 1000,

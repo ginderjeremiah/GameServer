@@ -7,6 +7,7 @@ import {
 	toughnessMitigatedDamage,
 	calculateSkillDamage,
 	cooldownMultiplier,
+	effectiveCriticalChance,
 	expectedCritMultiplier,
 	mitigateDamage,
 	resistanceTotal,
@@ -281,6 +282,29 @@ describe('battle-formulas', () => {
 
 		it('slows cooldowns for a CooldownRecovery below 1', () => {
 			expect(cooldownMultiplier(makeAttributes([[EAttribute.CooldownRecovery, 0.5]]))).toBeCloseTo(0.5, 10);
+		});
+	});
+
+	describe('effectiveCriticalChance', () => {
+		// The skill's own authored base (the per-skill opt-in enabler, #1453) × CriticalChanceMultiplier —
+		// the one composition the simulation, the skill tooltip, and the skills grid all read (#2439). These
+		// raw attributes skip the static base, so the multiplier is set explicitly; a real battler's base-1
+		// multiplier and its Luck derivation are exercised in battler.test.
+		it('composes the skill base with the multiplier', () => {
+			const attrs = makeAttributes([[EAttribute.CriticalChanceMultiplier, 1.04]]);
+			expect(effectiveCriticalChance(0.2, attrs)).toBeCloseTo(0.208, 10);
+		});
+
+		it('stays at 0 for an unauthored skill regardless of the multiplier (the opt-in)', () => {
+			// 0 × mult = 0 — the property the authored-only enabler design rests on.
+			const attrs = makeAttributes([[EAttribute.CriticalChanceMultiplier, 5]]);
+			expect(effectiveCriticalChance(0, attrs)).toBe(0);
+		});
+
+		it('leaves a product above 1 unclamped', () => {
+			// The engine draws against [0, 1), which saturates naturally; clamping is the rating's concern.
+			const attrs = makeAttributes([[EAttribute.CriticalChanceMultiplier, 2]]);
+			expect(effectiveCriticalChance(0.8, attrs)).toBeCloseTo(1.6, 10);
 		});
 	});
 

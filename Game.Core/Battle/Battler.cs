@@ -97,6 +97,47 @@ namespace Game.Core.Battle
         /// </summary>
         public double EffectiveDodgeChance => _attributes[DodgeChance] * _attributes[DodgeChanceMultiplier];
 
+        /// <summary>
+        /// This battler's composed critical-hit chance for a hit whose skill authored
+        /// <paramref name="baseCriticalChance"/> — <c>baseCriticalChance × CriticalChanceMultiplier</c>, the
+        /// product the engine draws against (<see cref="BattleContext.DamageTarget"/>'s player-fire half).
+        /// Unlike the avoidance pair, crit's enabler is authored <b>per skill</b>
+        /// (<see cref="Skills.Skill.CriticalChance"/>, #1453) rather than as an attribute, so it arrives as a
+        /// parameter — the same "attacker method taking the per-hit input" shape as <see cref="AmplifyDamage"/>.
+        /// Composed here at consumption so the live draw and <see cref="CombatRating"/>'s pricing of the same
+        /// capability cannot derive it differently (#2439). A skill's <c>CriticalChance</c> defaults to
+        /// <c>0</c> (an authored-only opt-in), so an un-authored skill never crits regardless of the
+        /// multiplier. Deliberately <b>unclamped</b> for <see cref="EffectiveParryChance"/>'s reason: a draw
+        /// against <c>[0, 1)</c> saturates naturally, and clamping is a rating-side concern.
+        /// </summary>
+        public double EffectiveCriticalChance(double baseCriticalChance)
+        {
+            return baseCriticalChance * _attributes[CriticalChanceMultiplier];
+        }
+
+        /// <summary>
+        /// This battler's Cull execute investment against a target with <paramref name="missingHpFraction"/> of
+        /// its health missing — <c>ExecuteBonus × missingHpFraction</c> (#1430). The damage multiplier the
+        /// engine applies is <c>1 +</c> this, and the Cull overlay tally books on the investment itself, so
+        /// both engine readings and <see cref="CombatRating"/>'s pricing share one composition site (#2439).
+        /// Only the <i>fraction</i> legitimately differs between them — the engine samples the live target's
+        /// missing health once per fire, the rating prices a fixed reference profile — which is why it is the
+        /// caller's input rather than something read here. <see cref="EAttribute.ExecuteBonus"/> is an
+        /// authored-only enabler idling at <c>0</c>, so an un-enabled build invests exactly <c>0</c> and its
+        /// multiplier is an exact <c>1.0</c>.
+        /// </summary>
+        /// <param name="missingHpFraction">
+        /// The target's missing-health fraction, which the <b>caller owns clamping to <c>[0, 1]</c></b> —
+        /// the engine <see cref="Math.Clamp"/>s its live sample at the sample site, the rating passes a fixed
+        /// reference constant. Not clamped here because the two callers establish it differently and neither
+        /// needs a second clamp; a value above <c>1</c> would over-invest and (since the Cull overlay tally
+        /// books on this) over-credit training.
+        /// </param>
+        public double ExecuteInvestment(double missingHpFraction)
+        {
+            return _attributes[ExecuteBonus] * missingHpFraction;
+        }
+
         public double GetAttributeValue(EAttribute attribute)
         {
             return _attributes[attribute];

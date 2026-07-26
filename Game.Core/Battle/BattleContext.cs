@@ -303,7 +303,7 @@ namespace Game.Core.Battle
             double rawDamage, IReadOnlyList<SkillDamagePortion> portions, double totalWeight,
             double baseCriticalChance, double critDraw, out double totalNetFloored)
         {
-            var isCrit = critDraw < baseCriticalChance * _activeBattler.GetAttributeValue(CriticalChanceMultiplier);
+            var isCrit = critDraw < _activeBattler.EffectiveCriticalChance(baseCriticalChance);
             var critMultiplier = isCrit ? _activeBattler.GetAttributeValue(CriticalDamage) : 1.0;
 
             // The Cull execute overlay (#1430): the target's missing-health fraction AT THE START of this
@@ -314,7 +314,7 @@ namespace Game.Core.Battle
             var targetMaxHealth = _targetBattler.GetAttributeValue(MaxHealth);
             var missingHpFraction = Math.Clamp(
                 (targetMaxHealth - _targetBattler.CurrentHealth) / targetMaxHealth, 0.0, 1.0);
-            var executeInvestment = _activeBattler.GetAttributeValue(ExecuteBonus) * missingHpFraction;
+            var executeInvestment = _activeBattler.ExecuteInvestment(missingHpFraction);
             var executeMultiplier = 1.0 + executeInvestment;
 
             // The Frequency cadence pseudo-overlay (#1426/#1527): the player's effective charge rate above the

@@ -50,12 +50,12 @@ function resolvePlayerHit(
 	skill: Skill,
 	critDraw: number
 ): { damage: number; crit: boolean; reflected: number } {
-	const crit = critDraw < skill.criticalChance * player.attributes.getValue(EAttribute.CriticalChanceMultiplier);
+	const crit = critDraw < player.effectiveCriticalChance(skill.criticalChance);
 	const raw = skill.calculateDamage();
 	const critMultiplier = crit ? player.attributes.getValue(EAttribute.CriticalDamage) : 1;
 	const maxHealth = enemy.attributes.getValue(EAttribute.MaxHealth);
 	const missingHpFraction = Math.min(1, Math.max(0, (maxHealth - enemy.currentHealth) / maxHealth));
-	const executeMultiplier = 1 + player.attributes.getValue(EAttribute.ExecuteBonus) * missingHpFraction;
+	const executeMultiplier = 1 + player.executeInvestment(missingHpFraction);
 	// Split the raw hit across the skill's weighted portions, each amplified, crit- and execute-scaled, then
 	// run through the typed mitigation pipeline (resistance, then the Toughness curve), summing the nets.
 	// The enemy (defender) then returns its reflection share of the summed net.
