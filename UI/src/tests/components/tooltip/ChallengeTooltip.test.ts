@@ -19,12 +19,15 @@ const { staticData, playerChallenges } = vi.hoisted(() => ({
 vi.mock('$stores', () => ({ staticData, playerChallenges }));
 
 import ChallengeTooltip from '$components/tooltip/ChallengeTooltip.svelte';
+import { makeItem } from '../../fixtures/items';
+import { makeZone } from '../../fixtures/zones';
 
 const zone = (id: number, order: number, name: string, unlockChallengeId?: number): IZone =>
-	({ id, name, description: '', order, levelMin: 1, levelMax: 10, bossLevel: 1, unlockChallengeId }) as IZone;
+	makeZone({ id, name, order, unlockChallengeId });
 
 const setup = (over: Partial<IChallenge> = {}) => {
 	staticData.challenges = [];
+	// Deliberately partial: `IChallenge` has no shared fixture yet (#2456); the tooltip reads only these fields.
 	staticData.challenges[5] = {
 		id: 5,
 		name: 'Cull the Swarm',
@@ -76,12 +79,12 @@ describe('ChallengeTooltip', () => {
 	it('seals a reward name while the challenge is incomplete, then reveals it once complete', () => {
 		setup({ rewardItemId: 3 });
 		staticData.items = [];
-		staticData.items[3] = {
+		staticData.items[3] = makeItem({
 			id: 3,
 			name: 'Iron Helm',
 			itemCategoryId: EItemCategory.Helm,
 			rarityId: ERarity.Rare
-		} as IItem;
+		});
 
 		const { container, unmount } = render(ChallengeTooltip, { props: { challengeId: 5 } });
 		const sealed = container.querySelector('.ct-name.sealed') as HTMLElement;

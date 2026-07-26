@@ -7,6 +7,7 @@ import ClassPicker from '$routes/select/ClassPicker.svelte';
 import { staticData } from '$stores/static-data.svelte';
 import { EEquipmentSlot, EModifierType, type ICreatableClass } from '$lib/api';
 
+/* Deliberately partial: `ICreatableClass` has no shared fixture yet (#2456). */
 const cls = (overrides: Partial<ICreatableClass> = {}): ICreatableClass =>
 	({
 		id: 0,

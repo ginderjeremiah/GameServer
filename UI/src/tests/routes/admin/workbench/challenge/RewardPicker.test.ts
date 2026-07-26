@@ -10,6 +10,7 @@ const RECORDS: PickerRecord[] = [
 	{ id: 3, name: 'Leather Boots', color: 'var(--rarity-common)', tag: 'Common' }
 ];
 
+/* Deliberately partial: `IChallenge` has no shared fixture yet (#2456). */
 const claimedBy = (id: number, name: string): Map<number, IChallenge> =>
 	new Map([[id, { id: 99, name } as IChallenge]]);
 

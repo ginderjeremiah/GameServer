@@ -20,6 +20,7 @@ vi.mock('$stores', () => ({ staticData }));
 import ActiveEffectChips from '$routes/game/screens/fight/ActiveEffectChips.svelte';
 import { makeBattler } from './fight-fixtures';
 import { makeAttribute } from '../../../../fixtures/attributes';
+import { makeSkill } from '../../../../fixtures/skills';
 import type { Battler } from '$lib/battle';
 
 const effect = (over: Partial<ISkillEffect> = {}): ISkillEffect => ({
@@ -42,7 +43,7 @@ beforeEach(() => {
 		makeAttribute(EAttribute.Toughness, 'Toughness')
 	];
 	// A skill owning the effect id the fixtures use, so the tooltip can resolve the source.
-	staticData.skills = [{ id: 0, name: 'Battle Cry', effects: [effect({ id: 1 })] } as ISkill];
+	staticData.skills = [makeSkill({ id: 0, name: 'Battle Cry', effects: [effect({ id: 1 })] })];
 	battler = makeBattler();
 });
 
@@ -92,8 +93,8 @@ describe('ActiveEffectChips', () => {
 		// Two DIFFERENT effects on the same (Strength, additive) from two DIFFERENT skills, with DIFFERENT
 		// amounts — the case the removed `combineEffectAmount(amount × count)` shortcut couldn't total correctly.
 		staticData.skills = [
-			{ id: 0, name: 'Battle Cry', effects: [effect({ id: 1 })] } as ISkill,
-			{ id: 1, name: 'War Drum', effects: [effect({ id: 2, amount: 3 })] } as ISkill
+			makeSkill({ id: 0, name: 'Battle Cry', effects: [effect({ id: 1 })] }),
+			makeSkill({ id: 1, name: 'War Drum', effects: [effect({ id: 2, amount: 3 })] })
 		];
 		battler.applyEffect(effect({ id: 1, attributeId: EAttribute.Strength, amount: 5 }));
 		battler.applyEffect(effect({ id: 2, attributeId: EAttribute.Strength, amount: 3 }));

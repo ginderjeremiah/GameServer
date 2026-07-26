@@ -8,10 +8,12 @@ import type { IZone } from '$lib/api';
    contract flushes out exactly nine suites plus the workbench's production `newItem`. Suites that
    seed zone-shaped literals into an untyped `staticData` mock are excluded on purpose — they see no
    new required field, and filling their previously-`undefined` fields could change what they render.
-   So are the few that assert a deliberately partial literal `as IZone` (`challenge-unlocks`,
-   `ChallengeTooltip`, `enemy-level`) — the cast opts them out of drift detection too, so they raise
-   no error either (#2447). A `grep` still finding zone literals under `src/tests/` is expected, not
-   a gap. */
+   A `grep` still finding zone literals under `src/tests/` is expected, not a gap.
+
+   A builder that asserted a partial literal `as IZone` was invisible to that probe by construction —
+   the cast silences the missing field, so it kept compiling. #2447 folded those three in
+   (`challenge-unlocks`, `ChallengeTooltip`, `enemy-level`); reintroducing such a cast re-opens the
+   hole, so state why if you do. */
 
 /**
  * Builds an {@link IZone} reference-data entry for tests. Everything but the id is a neutral

@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
-import { EChallengeType, ERarity, EItemModType, type IItemMod } from '$lib/api';
+import { EChallengeType, ERarity, EItemModType } from '$lib/api';
 import OverviewPane from '$routes/game/screens/challenges/OverviewPane.svelte';
+import { makeItemMod } from '../../../../fixtures/item-mods';
 import type {
 	ChallengeVM,
 	OverallSummary,
@@ -11,12 +12,12 @@ import type {
 
 afterEach(cleanup);
 
-const sampleMod: IItemMod = {
+const sampleMod = makeItemMod({
 	id: 5,
 	name: 'of Fury',
 	itemModTypeId: EItemModType.Suffix,
 	rarityId: ERarity.Common
-} as IItemMod;
+});
 
 const reward: ResolvedReward = {
 	kind: 'mod',

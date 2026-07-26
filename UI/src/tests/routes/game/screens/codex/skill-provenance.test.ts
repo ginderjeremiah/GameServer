@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ESkillAcquisition, type IItem, type ISkill } from '$lib/api';
 import { resolveSkillProvenance } from '$routes/game/screens/codex/skill-provenance';
+import { makeItem } from '../../../../fixtures/items';
 import { makeSkill } from '../../../../fixtures/skills';
 
 // Minimal fixtures — provenance only reads ids, names, the item-grant references and the flag.
@@ -8,7 +9,7 @@ import { makeSkill } from '../../../../fixtures/skills';
 const skill = (id: number, acquisition: ESkillAcquisition): ISkill => makeSkill({ id, acquisition });
 
 const item = (id: number, grantedSkillId?: number, retiredAt?: string): IItem =>
-	({ id, name: `Item ${id}`, grantedSkillId, retiredAt }) as IItem;
+	makeItem({ id, grantedSkillId, retiredAt });
 
 describe('resolveSkillProvenance', () => {
 	it('reports an item grant as a source', () => {

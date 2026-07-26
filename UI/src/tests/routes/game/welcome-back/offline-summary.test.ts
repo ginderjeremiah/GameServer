@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { ERarity, type IChallenge, type IChallengeCompletedModel, type IItem } from '$lib/api';
+import { ERarity, type IChallenge, type IChallengeCompletedModel } from '$lib/api';
 import { formatAwayDuration, resolveCompletedChallenges } from '$routes/game/welcome-back/offline-summary';
+import { makeItem } from '../../../fixtures/items';
 
 describe('formatAwayDuration', () => {
 	it('shows whole minutes under an hour', () => {
@@ -26,8 +27,10 @@ describe('formatAwayDuration', () => {
 });
 
 describe('resolveCompletedChallenges', () => {
-	const item: IItem = { id: 2, name: 'Aegis', rarityId: ERarity.Rare, itemCategoryId: 0 } as unknown as IItem;
-	// Id-indexed catalogue: index 1 is unused here but kept so id 2 stays at index 2.
+	const item = makeItem({ id: 2, name: 'Aegis', rarityId: ERarity.Rare });
+	/* Id-indexed catalogue: index 1 is unused here but kept so id 2 stays at index 2. The challenges stay
+	   deliberately partial — `IChallenge` has no shared fixture yet (#2456) — and the resolver reads only
+	   the name and reward id. */
 	const challenges: (IChallenge | undefined)[] = [
 		{ id: 0, name: 'First Blood', rewardItemId: 2 } as IChallenge,
 		undefined,

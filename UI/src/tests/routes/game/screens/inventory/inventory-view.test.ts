@@ -97,6 +97,12 @@ vi.mock('$stores', () => ({
 
 import { itemCategoryColor, itemCategoryName } from '$lib/common';
 import { InventoryView, SORTS, EQUIP_SLOTS } from '$routes/game/screens/inventory/inventory-view.svelte';
+import { makeSkill } from '../../../../fixtures/skills';
+
+/* A skill whose damage is wholly one type — the only axis the weapon-match gate reads. Thin adapter over
+   the shared contract fixture so the call sites stay positional. */
+const damageSkill = (id: number, name: string, type: EDamageType): ISkill =>
+	makeSkill({ id, name, damagePortions: [{ type, weight: 1 }] });
 
 const makeItem = (itemId: number, name: string, cat: EItemCategory, rarity: ERarity, extra: Partial<Item> = {}): Item =>
 	({
@@ -485,16 +491,13 @@ describe('InventoryView.compatibleMods', () => {
    prompts before applying, naming the skills that go dormant. The dormant derivation reuses the shared gate,
    so it can't disagree with what the battle fields. */
 describe('InventoryView weapon-swap warning', () => {
-	const makeSkill = (id: number, name: string, type: EDamageType): ISkill =>
-		({ id, name, damagePortions: [{ type, weight: 1 }] }) as unknown as ISkill;
-
 	const weapon = (itemId: number, name: string, weaponType: EDamageType) =>
 		makeItem(itemId, name, EItemCategory.Weapon, ERarity.Rare, { weaponType });
 
 	it('warns before equipping a weapon that dims a fielded selected skill, naming it', async () => {
 		// Wielding a Sword (a Sword skill is fielded); equipping an Axe leaves that Sword skill dormant.
 		weaponState.equippedWeaponType = EDamageType.Sword;
-		staticData.skills = [makeSkill(0, 'Slash', EDamageType.Sword)];
+		staticData.skills = [damageSkill(0, 'Slash', EDamageType.Sword)];
 		playerState.selectedSkills = [0];
 		unlockedItems.set(7, weapon(7, 'War Axe', EDamageType.Axe));
 
@@ -511,7 +514,7 @@ describe('InventoryView weapon-swap warning', () => {
 	it('warns when arming from bare hands dims a fielded Unarmed skill', async () => {
 		// Bare-handed, an Unarmed (punch-style) skill is fielded; equipping a Sword dims it.
 		weaponState.equippedWeaponType = EDamageType.Unarmed;
-		staticData.skills = [makeSkill(0, 'Jab', EDamageType.Unarmed)];
+		staticData.skills = [damageSkill(0, 'Jab', EDamageType.Unarmed)];
 		playerState.selectedSkills = [0];
 		unlockedItems.set(7, weapon(7, 'Iron Sword', EDamageType.Sword));
 
@@ -525,7 +528,7 @@ describe('InventoryView weapon-swap warning', () => {
 	it('aborts the equip when the player declines the warning', async () => {
 		confirmModal.mockResolvedValue(false);
 		weaponState.equippedWeaponType = EDamageType.Sword;
-		staticData.skills = [makeSkill(0, 'Slash', EDamageType.Sword)];
+		staticData.skills = [damageSkill(0, 'Slash', EDamageType.Sword)];
 		playerState.selectedSkills = [0];
 		unlockedItems.set(7, weapon(7, 'War Axe', EDamageType.Axe));
 
@@ -538,7 +541,7 @@ describe('InventoryView weapon-swap warning', () => {
 	it('does not warn when every selected skill is weapon-agnostic', async () => {
 		// Physical / elemental skills are never gated, so a weapon swap dims nothing.
 		weaponState.equippedWeaponType = EDamageType.Sword;
-		staticData.skills = [makeSkill(0, 'Strike', EDamageType.Physical), makeSkill(1, 'Ember', EDamageType.Fire)];
+		staticData.skills = [damageSkill(0, 'Strike', EDamageType.Physical), damageSkill(1, 'Ember', EDamageType.Fire)];
 		playerState.selectedSkills = [0, 1];
 		unlockedItems.set(7, weapon(7, 'War Axe', EDamageType.Axe));
 
@@ -550,7 +553,7 @@ describe('InventoryView weapon-swap warning', () => {
 
 	it('does not warn when the selected weapon-skill matches the incoming weapon', async () => {
 		weaponState.equippedWeaponType = EDamageType.Sword;
-		staticData.skills = [makeSkill(0, 'Cleave', EDamageType.Axe)];
+		staticData.skills = [damageSkill(0, 'Cleave', EDamageType.Axe)];
 		playerState.selectedSkills = [0];
 		unlockedItems.set(7, weapon(7, 'War Axe', EDamageType.Axe));
 
@@ -563,7 +566,7 @@ describe('InventoryView weapon-swap warning', () => {
 	it('does not warn when a skill was already dormant under the current weapon', async () => {
 		// Wielding a Sword, a Bow skill is already dormant; swapping to an Axe dims nothing new.
 		weaponState.equippedWeaponType = EDamageType.Sword;
-		staticData.skills = [makeSkill(0, 'Snipe', EDamageType.Bow)];
+		staticData.skills = [damageSkill(0, 'Snipe', EDamageType.Bow)];
 		playerState.selectedSkills = [0];
 		unlockedItems.set(7, weapon(7, 'War Axe', EDamageType.Axe));
 
@@ -577,9 +580,9 @@ describe('InventoryView weapon-swap warning', () => {
 		// Two fielded Sword skills dim when swapping to an Axe; the agnostic skill never does.
 		weaponState.equippedWeaponType = EDamageType.Sword;
 		staticData.skills = [
-			makeSkill(0, 'Slash', EDamageType.Sword),
-			makeSkill(1, 'Parry', EDamageType.Sword),
-			makeSkill(2, 'Strike', EDamageType.Physical)
+			damageSkill(0, 'Slash', EDamageType.Sword),
+			damageSkill(1, 'Parry', EDamageType.Sword),
+			damageSkill(2, 'Strike', EDamageType.Physical)
 		];
 		playerState.selectedSkills = [0, 1, 2];
 		unlockedItems.set(7, weapon(7, 'War Axe', EDamageType.Axe));
@@ -595,7 +598,7 @@ describe('InventoryView weapon-swap warning', () => {
 
 	it('does not run the weapon warning when equipping into a non-weapon slot', async () => {
 		weaponState.equippedWeaponType = EDamageType.Sword;
-		staticData.skills = [makeSkill(0, 'Slash', EDamageType.Sword)];
+		staticData.skills = [damageSkill(0, 'Slash', EDamageType.Sword)];
 		playerState.selectedSkills = [0];
 		const helm = makeItem(8, 'Iron Helm', EItemCategory.Helm, ERarity.Common);
 		unlockedItems.set(8, helm);
@@ -611,13 +614,10 @@ describe('InventoryView weapon-swap warning', () => {
    isn't Unarmed — the same silent surprise the equip warning guards against, reached via a different action.
    The unequip path runs the same gate against `nextWeaponType = Unarmed`. */
 describe('InventoryView weapon-unequip warning', () => {
-	const makeSkill = (id: number, name: string, type: EDamageType): ISkill =>
-		({ id, name, damagePortions: [{ type, weight: 1 }] }) as unknown as ISkill;
-
 	it('warns before unequipping a weapon that dims a fielded selected skill, naming it', async () => {
 		// Wielding a Sword (a Sword skill is fielded); unequipping leaves that Sword skill dormant.
 		weaponState.equippedWeaponType = EDamageType.Sword;
-		staticData.skills = [makeSkill(0, 'Slash', EDamageType.Sword)];
+		staticData.skills = [damageSkill(0, 'Slash', EDamageType.Sword)];
 		playerState.selectedSkills = [0];
 
 		await new InventoryView().unequip(4); // WeaponSlot
@@ -633,7 +633,7 @@ describe('InventoryView weapon-unequip warning', () => {
 	it('aborts the unequip when the player declines the warning', async () => {
 		confirmModal.mockResolvedValue(false);
 		weaponState.equippedWeaponType = EDamageType.Sword;
-		staticData.skills = [makeSkill(0, 'Slash', EDamageType.Sword)];
+		staticData.skills = [damageSkill(0, 'Slash', EDamageType.Sword)];
 		playerState.selectedSkills = [0];
 
 		await new InventoryView().unequip(4);
@@ -646,9 +646,9 @@ describe('InventoryView weapon-unequip warning', () => {
 		// Two fielded Sword skills dim when unequipping; the agnostic skill never does.
 		weaponState.equippedWeaponType = EDamageType.Sword;
 		staticData.skills = [
-			makeSkill(0, 'Slash', EDamageType.Sword),
-			makeSkill(1, 'Parry', EDamageType.Sword),
-			makeSkill(2, 'Strike', EDamageType.Physical)
+			damageSkill(0, 'Slash', EDamageType.Sword),
+			damageSkill(1, 'Parry', EDamageType.Sword),
+			damageSkill(2, 'Strike', EDamageType.Physical)
 		];
 		playerState.selectedSkills = [0, 1, 2];
 
@@ -663,7 +663,7 @@ describe('InventoryView weapon-unequip warning', () => {
 
 	it('does not warn when every selected skill is weapon-agnostic', async () => {
 		weaponState.equippedWeaponType = EDamageType.Sword;
-		staticData.skills = [makeSkill(0, 'Strike', EDamageType.Physical), makeSkill(1, 'Ember', EDamageType.Fire)];
+		staticData.skills = [damageSkill(0, 'Strike', EDamageType.Physical), damageSkill(1, 'Ember', EDamageType.Fire)];
 		playerState.selectedSkills = [0, 1];
 
 		await new InventoryView().unequip(4);
@@ -674,7 +674,7 @@ describe('InventoryView weapon-unequip warning', () => {
 
 	it('does not run the weapon warning when unequipping a non-weapon slot', async () => {
 		weaponState.equippedWeaponType = EDamageType.Sword;
-		staticData.skills = [makeSkill(0, 'Slash', EDamageType.Sword)];
+		staticData.skills = [damageSkill(0, 'Slash', EDamageType.Sword)];
 		playerState.selectedSkills = [0];
 
 		await new InventoryView().unequip(0); // HelmSlot
@@ -685,7 +685,7 @@ describe('InventoryView weapon-unequip warning', () => {
 
 	it('warns through toggleEquip when unequipping an equipped weapon dims a fielded skill', async () => {
 		weaponState.equippedWeaponType = EDamageType.Sword;
-		staticData.skills = [makeSkill(0, 'Slash', EDamageType.Sword)];
+		staticData.skills = [damageSkill(0, 'Slash', EDamageType.Sword)];
 		playerState.selectedSkills = [0];
 		const equippedWeapon = makeItem(2, 'Alpha Blade', EItemCategory.Weapon, ERarity.Legendary, {
 			equipped: true,

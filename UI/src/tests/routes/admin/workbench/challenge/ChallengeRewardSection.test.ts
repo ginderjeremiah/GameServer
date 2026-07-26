@@ -48,6 +48,7 @@ const config = (): EntityConfig<Identified> =>
 	}) as unknown as EntityConfig<Identified>;
 
 const setup = (over: Partial<IChallenge> = {}) => {
+	/* Deliberately partial: `IChallenge` has no shared fixture yet (#2456). */
 	const challenge: IChallenge = {
 		id: 1,
 		name: 'Test',
