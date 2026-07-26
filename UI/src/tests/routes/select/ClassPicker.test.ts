@@ -8,15 +8,14 @@ import { staticData } from '$stores/static-data.svelte';
 import { EEquipmentSlot, type ICreatableClass } from '$lib/api';
 import { makeCreatableClass } from '../../fixtures/classes';
 
-/* The passive diverges from the fixture's inert default: the picker renders its attribute chip, so the
-   class carries a real passive (Endurance +8) for those assertions to read. */
+/* `passiveAmount` diverges from the fixture's inert 0: the picker renders the passive as an attribute
+   chip, so the class needs a real amount for those assertions to read. The attribute itself is the
+   fixture's default (Endurance), which is what the mocked `staticData.attributes` resolves to. */
 const cls = (overrides: Partial<ICreatableClass> = {}): ICreatableClass =>
 	makeCreatableClass({
 		id: 0,
 		name: 'Warrior',
 		description: 'A frontline fighter.',
-		word: 'kor',
-		passiveAttributeId: 1,
 		passiveAmount: 8,
 		...overrides
 	});
@@ -59,9 +58,6 @@ describe('ClassPicker', () => {
 		const classes = [
 			cls({
 				id: 0,
-				description: 'A frontline fighter.',
-				passiveAttributeId: 1,
-				passiveAmount: 8,
 				starterSkills: [
 					{ id: 1, name: 'Slash' },
 					{ id: 0, name: 'Punch' }

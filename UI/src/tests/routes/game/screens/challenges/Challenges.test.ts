@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, screen, fireEvent } from '@testing-library/svelte';
-import { EChallengeGoalComparison, EChallengeType, type IChallenge, type IPlayerChallenge } from '$lib/api';
+import { EChallengeGoalComparison, EChallengeType, type IPlayerChallenge } from '$lib/api';
 
 // Challenges fetches the player's progress over the socket (via the playerChallenges store) and
 // resolves the challenge catalogue + reward pools from staticData.
@@ -25,12 +25,6 @@ vi.mock('$stores', async (importOriginal) => {
 import Challenges from '$routes/game/screens/challenges/Challenges.svelte';
 import { makeChallenge } from '../../../../fixtures/challenges';
 
-/* `challengeTypeId` stays required rather than inheriting the fixture default — the card's type badge and
-   objective sentence are driven by it — and the description is generated from the name so the rendered
-   card carries real prose instead of the fixture's empty placeholder. */
-const challenge = (over: Partial<IChallenge> & Pick<IChallenge, 'id' | 'name' | 'challengeTypeId'>): IChallenge =>
-	makeChallenge({ description: `${over.name} description`, ...over });
-
 const PLAYER_CHALLENGES: IPlayerChallenge[] = [{ challengeId: 1, progress: 5, completed: false }];
 
 beforeEach(() => {
@@ -42,8 +36,16 @@ beforeEach(() => {
 	staticData.challengeTypes = [
 		{ id: EChallengeType.EnemiesKilled, goalComparison: EChallengeGoalComparison.AtLeast, name: 'Enemies Killed' }
 	];
+	/* The type is stated rather than inherited (it drives the card's badge and objective sentence), and the
+	   description is real prose rather than the fixture's empty placeholder so the card renders one. */
 	staticData.challenges = [
-		challenge({ id: 1, name: 'First Blood', challengeTypeId: EChallengeType.EnemiesKilled, progressGoal: 10 })
+		makeChallenge({
+			id: 1,
+			name: 'First Blood',
+			description: 'First Blood description',
+			challengeTypeId: EChallengeType.EnemiesKilled,
+			progressGoal: 10
+		})
 	];
 	mockToastError.mockClear();
 	mockFetchSocket.mockClear();

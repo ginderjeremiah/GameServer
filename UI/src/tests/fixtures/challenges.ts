@@ -26,6 +26,11 @@ import { EChallengeType, EEntityType, type IChallenge } from '$lib/api';
  * surfaces, so a suite exercising either states **both** explicitly rather than leaning on these
  * defaults — as does one whose subject is the type→statistic derivation.
  *
+ * That pairing is deliberately **off the production manifold**: `deriveFromType` always writes
+ * `statisticType`/`entityType` from the type, so `EnemiesKilled` with `entityType: None` and no
+ * statistic is a record the workbench can never author. Neutral is the point here — don't read a bare
+ * `makeChallenge({ id })` as production-shaped.
+ *
  * The optional fields (`statisticType`, `targetEntityId`, `rewardItemId`, `rewardItemModId`,
  * `retiredAt`) are left unset for the same reason: each flips a distinct branch — the goal unit, the
  * scope target, reward resolution, retirement filtering — when present.
