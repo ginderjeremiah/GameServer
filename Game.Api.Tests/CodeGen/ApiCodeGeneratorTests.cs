@@ -1,6 +1,6 @@
 using Game.Api.CodeGen;
 using Game.Core;
-using Game.TestInfrastructure.Helpers;
+using Game.Core.TestInfrastructure.Helpers;
 using Xunit;
 
 namespace Game.Api.Tests.CodeGen
