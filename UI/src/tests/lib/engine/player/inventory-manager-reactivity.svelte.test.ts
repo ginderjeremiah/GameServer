@@ -5,6 +5,8 @@ import type { IInventoryData, IInventoryItem, IItem, IItemMod } from '$lib/api';
 import { statify } from '$lib/common';
 // Aliased: this suite's own `makeItem` is an id-only adapter over the shared contract builder.
 import { makeItem as makeItemContract } from '../../../fixtures/items';
+// Aliased for the same reason: the local `makeItemMod` is an id-only adapter over the shared builder.
+import { makeItemMod as makeItemModContract } from '../../../fixtures/item-mods';
 
 const mockInventoryData: IInventoryData = {
 	unlockedItems: [],
@@ -66,16 +68,15 @@ const makeItem = (id: number): IItem =>
 		modSlots: [{ id: 0, itemId: id, itemModSlotTypeId: EItemModType.Component }]
 	});
 
-const makeItemMod = (id: number): IItemMod => ({
-	id,
-	name: `Mod ${id}`,
-	description: `Mod description ${id}`,
-	designerNotes: '',
-	itemModTypeId: EItemModType.Component,
-	rarityId: ERarity.Uncommon,
-	attributes: [{ attributeId: EAttribute.Agility, amount: 3 }],
-	tags: []
-});
+const makeItemMod = (id: number): IItemMod =>
+	makeItemModContract({
+		id,
+		description: `Mod description ${id}`,
+		// Stated rather than inherited: it has to match the `Component` slot the fixture item carries.
+		itemModTypeId: EItemModType.Component,
+		rarityId: ERarity.Uncommon,
+		attributes: [{ attributeId: EAttribute.Agility, amount: 3 }]
+	});
 
 const makeInventoryItem = (overrides: Partial<IInventoryItem> & { itemId: number }): IInventoryItem => ({
 	equipped: false,

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { EAttribute, EItemCategory, EItemModType, ERarity } from '$lib/api';
 import type { IInventoryItem, IItem, IItemMod } from '$lib/api';
 import { makeItem } from '../../fixtures/items';
+import { makeItemMod } from '../../fixtures/item-mods';
 
 const { mockItems, mockItemMods } = vi.hoisted(() => ({
 	mockItems: [] as IItem[],
@@ -28,19 +29,16 @@ mockItems[1] = makeItem({
 	rarityId: ERarity.Epic,
 	attributes: [{ attributeId: EAttribute.Strength, amount: 5 }]
 });
-mockItemMods[7] = {
+mockItemMods[7] = makeItemMod({
 	id: 7,
 	name: 'Flaming',
-	description: '',
-	designerNotes: '',
 	itemModTypeId: EItemModType.Prefix,
 	rarityId: ERarity.Legendary,
 	attributes: [
 		{ attributeId: EAttribute.Strength, amount: 3 },
 		{ attributeId: EAttribute.Agility, amount: 2 }
-	],
-	tags: []
-};
+	]
+});
 
 const invItem: IInventoryItem = {
 	itemId: 1,

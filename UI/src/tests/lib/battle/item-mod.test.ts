@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EAttribute, EItemModType, ERarity, type IItemMod } from '$lib/api';
+import { makeItemMod } from '../../fixtures/item-mods';
 
 // `newItemMod` resolves the mod's static definition out of the in-memory
 // reference cache by id (positional, mirroring `newItem` for inventory items),
@@ -16,11 +17,10 @@ vi.mock('$stores', () => ({
 
 import { newItemMod } from '$lib/battle/item-mod';
 
-mockItemMods[7] = {
+mockItemMods[7] = makeItemMod({
 	id: 7,
 	name: 'Flaming',
 	description: 'Burns the wielder a little too',
-	designerNotes: '',
 	itemModTypeId: EItemModType.Prefix,
 	rarityId: ERarity.Legendary,
 	attributes: [
@@ -28,7 +28,7 @@ mockItemMods[7] = {
 		{ attributeId: EAttribute.Agility, amount: 2 }
 	],
 	tags: [1, 2]
-};
+});
 
 describe('newItemMod', () => {
 	it('merges the static mod definition with the applied slot binding', () => {

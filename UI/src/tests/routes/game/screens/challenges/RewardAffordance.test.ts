@@ -5,17 +5,15 @@ import RewardAffordance from '$routes/game/screens/challenges/RewardAffordance.s
 import RewardAffordanceFixture from './RewardAffordanceFixture.svelte';
 import type { RewardTooltipController } from '$routes/game/screens/challenges/reward-tooltip-context';
 import type { ResolvedReward } from '$routes/game/screens/challenges/challenges-view.svelte';
+import { makeItemMod } from '../../../../fixtures/item-mods';
 
-const sampleMod: IItemMod = {
+const sampleMod: IItemMod = makeItemMod({
 	id: 213,
 	name: 'Honed',
 	description: 'Honed',
-	designerNotes: '',
 	itemModTypeId: EItemModType.Prefix,
-	rarityId: ERarity.Rare,
-	attributes: [],
-	tags: []
-};
+	rarityId: ERarity.Rare
+});
 
 const modReward = (revealed: boolean): ResolvedReward => ({
 	kind: 'mod',

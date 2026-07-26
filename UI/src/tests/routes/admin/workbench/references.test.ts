@@ -6,7 +6,6 @@ import {
 	EItemCategory,
 	EItemModType,
 	EModifierType,
-	ERarity,
 	type IChallenge,
 	type IClass,
 	type IEnemy,
@@ -27,6 +26,7 @@ import {
 import { makePath, makeProficiency } from '../../../fixtures/proficiencies';
 import { makeSkill } from '../../../fixtures/skills';
 import { makeItem } from '../../../fixtures/items';
+import { makeItemMod } from '../../../fixtures/item-mods';
 import { makeZone } from '../../../fixtures/zones';
 
 const enemy = (id: number, name: string, opts: Partial<IEnemy> = {}): IEnemy => ({
@@ -56,17 +56,8 @@ const challenge = (id: number, name: string, opts: Partial<IChallenge> = {}): IC
 const item = (id: number, name: string, opts: Partial<IItem> = {}): IItem =>
 	makeItem({ id, name, itemCategoryId: EItemCategory.Helm, ...opts });
 
-const itemMod = (id: number, name: string, opts: Partial<IItemMod> = {}): IItemMod => ({
-	id,
-	name,
-	description: '',
-	itemModTypeId: EItemModType.Prefix,
-	rarityId: ERarity.Common,
-	attributes: [],
-	tags: [],
-	designerNotes: '',
-	...opts
-});
+const itemMod = (id: number, name: string, opts: Partial<IItemMod> = {}): IItemMod =>
+	makeItemMod({ id, name, itemModTypeId: EItemModType.Prefix, ...opts });
 
 const wclass = (id: number, name: string, opts: Partial<IClass> = {}): IClass => ({
 	id,
