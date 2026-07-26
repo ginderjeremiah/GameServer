@@ -1,0 +1,204 @@
+# Spike #2467 — Cross-instance stale-absolute-overwrite in the write-behind drain
+
+- **Spike issue:** [#2467](https://github.com/ginderjeremiah/GameServer/issues/2467)
+- **Status:** Research complete; direction decided and split into implementation sub-issues (see [Implementation issues](#implementation-issues)). The decisions below are the recommendation from this research, open to revision before the first sub-issue lands.
+- **Predecessor:** [#2460](https://github.com/ginderjeremiah/GameServer/issues/2460) closed the *within-instance* half by remembering parked player lanes across drain passes (`_parkedPlayerLanes`).
+
+## The hazard, restated precisely
+
+`DataProviderSynchronizer` drains a fleet-shared Redis queue. Reservation is sequential, but an item parked
+on the shared processing list (a DB-infrastructure outage, or an acknowledge that faulted after a durable
+apply) is only remembered in the parking instance's own memory. So:
+
+1. Instance **A** reserves `E1` for player P (exp=100), exhausts its retries, classifies an infrastructure
+   failure, and leaves the item reserved on the processing list.
+2. Instance **B** reserves P's next event `E2` (exp=150). B has no knowledge of A's parked item, so it
+   applies immediately.
+3. Any instance later reclaims `E1` and applies it → Postgres regresses to exp=100.
+4. Redis still holds the correct blob, so nothing self-corrects until P's next save re-dirties the same
+   rows. A player dormant past the player-key TTL then gets the regressed state served from the DB
+   fallback: durable progress loss, a re-completable challenge, a re-locked zone.
+
+### Three findings that change the shape of the fix
+
+**1. The issue's list of five affected handlers is incomplete.** Verified against every registered
+`IPlayerUpdateHandler`. Only four handlers are genuinely convergent under reordering — the pure
+insert-if-missing ones. Everything else writes absolute state and can regress:
+
+| Handler | Write shape | Order-sensitive? |
+|---|---|---|
+| `SkillUnlockedHandler`, `ItemUnlockedHandler`, `ModUnlockedHandler` | insert-if-missing | No — convergent |
+| `LessonUnlockedHandler` | insert, absorb unique violation | No — convergent |
+| `PlayerCoreUpdatedHandler` | absolute `ExecuteUpdate` of all core fields | **Yes** |
+| `ProgressUpdatedHandler` | absolute upsert per stat/challenge/proficiency row | **Yes** |
+| `SelectedSkillsChangedHandler` | whole-set rebuild of every `PlayerSkill` flag | **Yes** |
+| `ItemEquippedHandler` | vacate destination slot, then absolute place | **Yes** |
+| `ItemUnequippedHandler` | absolute `EquipmentSlotId = null` | **Yes** (see below) |
+| `LogPreferenceChangedHandler` | absolute `Enabled` per log type | **Yes** |
+| `AttributeAllocationsChangedHandler` | absolute `Amount` per attribute | **Yes** |
+| `ItemFavoriteChangedHandler` | absolute `Favorite` | **Yes** |
+| `ModAppliedHandler` | delete-then-insert per `(player, item, slot)` | **Yes** |
+| `ModRemovedHandler` | `ExecuteDelete` per `(player, item, slot)` | **Yes** |
+| `LessonReadHandler` | absolute `ReadAt` | **Yes** |
+
+`AttributeAllocationsChangedHandler` is the most consequential omission from the issue's list: a stale
+apply durably reverts a player's spent stat points while `StatPointsUsed` on `Player` may reflect the newer
+value, leaving the two disagreeing.
+
+**2. `docs/backend-persistence.md` doesn't just understate the hazard for unequip — it asserts the
+opposite.** The doc says *"The exception is unequip, where 'missing row' already is the desired end state
+(unequipped = no equipped row), so its no-op converges without an insert."* That is true for the
+reordered-behind-its-unlock case it was written about, but it reads as a general order-safety claim, and
+unequip is **not** order-safe: a stale `ItemUnequippedEvent` applied after a newer `ItemEquippedEvent`
+durably unequips an item the player is wearing. The doc's convergence argument needs to be split by
+*reordering kind*, not by handler.
+
+**3. Making `_parkedPlayerLanes` fleet-shared does not fix this, and was the first thing evaluated.**
+The obvious cheap fix — publish the parked-player marker to Redis so every instance defers — fails on
+timing, not on cost. Reservation is sequential and the park happens only *after* the retry budget is
+exhausted (~0.6s by default), so `E2` is reserved **and applied** by B before A ever sets the marker. To
+close the window the marker would have to be claimed at *reserve* time (a fleet-wide per-player in-flight
+lock, atomic with the `LMOVE`), which reintroduces exactly the same-player cross-fleet serialization
+`#1701` set out to relax and still leaves the marker to leak on a crash. **Sequencing is not merely the
+"obvious shape" — it is the only shape that is correct by construction**, because it makes the guard depend
+on the events' own relative age rather than on any instance observing another's state in time.
+
+## Decisions
+
+### 1. Where the sequence comes from — the producing aggregate, stamped at buffer time
+
+Each write-behind aggregate (`Player`, `PlayerProgress`) owns a monotonic `long` counter, incremented once
+per save, stamped onto each envelope as it is buffered into `PlayerUpdateBatch`.
+
+Rejected alternatives:
+
+- **Redis `INCR` per player at enqueue.** Adds a round trip to the hottest, most correctness-sensitive
+  path in the game — the same cost the batched single-`LPUSH` flush exists to avoid. A hi/lo block
+  allocator (`INCRBY` a block per connection) would amortize that to ~zero, and is the fallback if the
+  seeding caveat below ever bites, but it adds a second per-player Redis key with its own TTL to reason
+  about for a case the existing TTL invariant already excludes.
+- **Reusing an existing marker.** Nothing on the aggregate is monotonic. `LastActivity` is a wall clock
+  and would import cross-instance skew into a correctness guard.
+
+The aggregate is the natural owner because **a player has exactly one live socket**, so the producer side
+needs no distributed coordination at all — only the consumer side interleaves.
+
+**Separate sequences per aggregate, not one shared.** The player and progress aggregates are separate
+enqueues, ordered independently today, and write disjoint tables. Sharing one counter would mean threading
+it between two repositories for zero benefit; two independent sequence spaces never interact because their
+watermarks never cover the same row.
+
+**Stamp at buffer time, not flush time.** This falls out for free and is strictly better: when a failed
+flush carries envelopes forward into the *next* save's flush (`PlayerUpdateBatch` deliberately keeps them
+buffered, #1494), the carried events retain their original lower sequence, so if the two saves' items are
+later applied out of order the older one is correctly rejected rather than winning.
+
+**All events of one save share one sequence.** The guard therefore has to reject on `<` (strictly older),
+never `<=`: same-sequence siblings must all apply, and a duplicate re-apply of the same event must stay
+idempotent under the queue's at-least-once contract.
+
+**Plumbing.** `Sequence` goes on `DomainEventEnvelope` (defaulted, exactly like `Id` — so an envelope
+enqueued by a pre-upgrade instance mid-rolling-deploy still deserializes and simply carries sequence 0),
+not onto every domain event record. `PlayerUpdateEventDispatcher` then hands handlers a small
+`PlayerUpdateContext` carrying it, rather than widening `IPlayerUpdateHandler<T>.HandleAsync` with a
+positional parameter.
+
+### 2. Where the watermark lives — one generic table, granularity chosen per stream
+
+`PlayerWriteWatermark(PlayerId, Stream, TargetKey, LastAppliedSequence)`, upserted inside the guarded
+handler's own `SaveChangesAsync` (no extra round trip).
+
+**A single "last applied sequence" per player — the issue's first suggested fork — is wrong, and this is
+the most important finding of the spike.** The guard's granularity must be at least as fine as the row
+identity the absolute write targets, or it manufactures a *worse* bug than the one it fixes. A per-player
+watermark would reject a slightly-older event carrying an entirely different, still-current row: an older
+`LogPreferenceChanged` for log type A discarded because a newer one for type B already landed, or — far
+worse — an older `ProgressUpdated` carrying statistic X discarded because a newer one carrying only
+statistic Y landed first. Progress events carry only a save's *dirty* rows, so a coarse watermark would
+silently drop live writes on the game's highest-volume path.
+
+`Stream` is a small enum (one per guarded handler); `TargetKey` is the canonical identity of the write
+target within that stream (`""` for the genuinely player-scoped streams, `"42"` for a `(player, item)`
+target, `"7:19"` for a `(statisticType, entityId)` pair). Chosen over **per-row version columns** on the
+six-plus affected tables because:
+
+- **It survives tombstones.** `ModRemovedHandler` deletes the row outright, so a per-row column takes the
+  version to the grave with it: a stale `ModApplied` arriving after a newer `ModRemoved` finds no row to
+  compare against and resurrects the mod. A watermark row outlives the data row it guards.
+- One migration, not six, and it never widens `Player` — a row read on effectively every socket command.
+- Granularity becomes a per-handler decision rather than a schema commitment.
+
+Its honest costs: one extra upsert per guarded event, and a row count that grows with a player's distinct
+write targets (bounded by the guarded data itself). If the owner prefers strongly-typed per-row columns,
+that is a defensible alternative — but it must then solve the `AppliedMod` tombstone explicitly, e.g. by
+keeping the mod stream on a watermark row anyway.
+
+**A vacated row must be stamped too.** `ItemEquippedHandler` clears the destination slot's previous
+occupant as a side effect of an absolute "item I is in slot S" statement. That eviction has to advance the
+evicted target's watermark as well, or replaying the older equip that put it there will find its watermark
+untouched, apply, and produce two items in one slot — tripping the partial unique index and cascading into
+the equip handler's vacate-retry. Every row a guarded handler writes, **including ones it only clears**,
+carries the stamp.
+
+### 3. How a stale event is disposed of — acknowledged, counted, and surfaced
+
+Acknowledge it as a successful no-op (it is genuinely already-superseded work, not a failure), but count
+rejections per drain pass and log a single summary line when non-zero — the class already throttles this
+way for `_lastReportedDeadLetterDepth` and `_infrastructureOutageLogged`. Silently dropping writes on a
+path whose whole purpose is "never silently drop a write" would make a genuine reordering storm — or a bug
+in the sequencing itself — invisible.
+
+### 4. Which handlers get guarded — every one except the four convergent inserts
+
+Per the table above: the pure insert-if-missing handlers (`SkillUnlocked`, `ItemUnlocked`, `ModUnlocked`,
+`LessonUnlocked`) stay unguarded. Scoping to only the five handlers the issue named would leave
+`AttributeAllocationsChanged`, `ItemUnequipped`, `ModApplied`/`ModRemoved`, `ItemFavoriteChanged`, and
+`LessonRead` regressing exactly as before.
+
+### 5. Interaction with #1739 — none, and that is a consequence of decision 2
+
+Batching consecutive same-player events onto one `SaveChangesAsync` would, under a *player-scoped*
+watermark, have to compare against the batch's highest sequence. Under per-target watermarks the two
+designs are orthogonal: each event in the batch compares against its own targets with its own sequence, in
+whatever order the batch applies them. Landing this spike's work first makes #1739 simpler, not harder.
+
+### 6. #2460's deferral can be dropped once the guard lands
+
+`_parkedPlayerLanes` exists solely to stop a newer event applying ahead of a parked older one. Once the
+guard makes that harmless — the reclaimed older event is simply rejected — the deferral is pure convergence
+latency for the affected player with no correctness value, and should be removed in the same change rather
+than leaving two mechanisms guarding one invariant. The **pass-scoped** `playerLanes` map stays: it still
+preserves ordering cheaply within a pass and avoids doing work only to reject it.
+
+## Producer-counter seeding, and the one residual gap
+
+The counter is persisted in each aggregate's cached representation (`PlayerCacheModel`; a reserved field in
+the progress hash), so it survives reconnects and instance migration — the cases that matter. On a **cold
+DB load** (cache miss) it is seeded from the player's highest `LastAppliedSequence`.
+
+That seed is correct whenever the queue has drained, which is the only way a cache miss normally happens:
+the miss means the player was dormant past the multi-hour key TTL, and the *TTL ≫ max queue-drain time*
+invariant means their events drained long ago. The residual gap is a cache key lost (eviction under
+memory pressure, an operator delete) **while events are still undrained** — the counter reseeds below its
+true high-water mark, and a stale event can then out-rank a newer one. That is the same scenario the TTL
+invariant already excludes by design, and it is strictly no worse than today's behaviour, so it is
+accepted and documented rather than engineered around. The hi/lo block allocator above is the escape hatch
+if it ever proves real.
+
+## Implementation issues
+
+| Issue | Scope |
+|---|---|
+| [#2473](https://github.com/ginderjeremiah/GameServer/issues/2473) | Carry a per-player write sequence on the envelope and the producing aggregates |
+| [#2474](https://github.com/ginderjeremiah/GameServer/issues/2474) | Add `PlayerWriteWatermark` and guard the absolute-value handlers against stale writes |
+| [#2475](https://github.com/ginderjeremiah/GameServer/issues/2475) | Retire `_parkedPlayerLanes` once the sequence guard makes the deferral redundant |
+
+## Aside: where the original assumption eroded
+
+The [#548 spike](./548-battle-end-io-write-behind.md) recorded, as a key enabling fact, that *"the queue
+drains FIFO and sequentially … so per-player events apply in order — no stale-overwrite from
+reordering."* That was accurate for a single-instance, strictly-serial drain. Multi-instance operation and
+then #1701's bounded per-pass concurrency each eroded it a little further, and the tolerance argument in
+`docs/backend-persistence.md` was extended along the way without re-deriving which reorderings actually
+converge. The guard proposed here replaces that inherited assumption with an invariant the handlers
+enforce for themselves.
