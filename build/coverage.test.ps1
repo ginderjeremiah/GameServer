@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
   Tests for the logic in build/*.ps1 — the coverage aggregation, floor suggestion, ratchet, test-log
@@ -22,8 +22,8 @@
   pwsh 7, and Pester 7 cannot run under 5.1 (which preinstalls the incompatible 3.4 dialect). A
   dependency-free harness runs wherever the scripts it tests run.
 
-  Assertion text is deliberately ASCII: these files are BOM-less UTF-8, which Windows PowerShell 5.1
-  reads as ANSI, so a non-ASCII literal would not survive the round trip on the host 5.1 support exists for.
+  Every build/*.ps1 is UTF-8 with a BOM, which is what makes 5.1 decode it as UTF-8 rather than as
+  the active ANSI code page — the encoding cases below assert it.
 .OUTPUTS
   Exit 0 = every case passed. Exit 1 = at least one case failed.
 #>
@@ -170,6 +170,22 @@ function Invoke-Suggestions($caseName, $assemblies, $floors) {
 }
 
 try {
+  Write-Host ''
+  Write-Host '=== Script encoding (a BOM is what makes 5.1 read these as UTF-8) ==='
+
+  # Windows PowerShell 5.1 decodes a BOM-less file with the active ANSI code page, so without the BOM
+  # every non-ASCII character in host output and comment-based help prints as mojibake on the exact
+  # host `#Requires -Version 5.1` exists to serve. That makes the BOM a contract of these files rather
+  # than an editor artifact, and nothing else would catch its loss: pwsh 7 (which CI runs) decodes
+  # them correctly either way, so a dropped BOM stays invisible until someone runs them under 5.1.
+  # Asserted over the whole folder so a newly added script is covered without touching this test.
+  foreach ($buildScript in (Get-ChildItem -Path $PSScriptRoot -Filter '*.ps1' | Sort-Object Name)) {
+    $leadingBytes = [System.IO.File]::ReadAllBytes($buildScript.FullName) |
+      Select-Object -First 3 |
+      ForEach-Object { $_.ToString('X2') }
+    Assert-Equal "$($buildScript.Name) starts with a UTF-8 BOM" 'EF BB BF' ($leadingBytes -join ' ')
+  }
+
   Write-Host ''
   Write-Host '=== Get-NamespaceCoverage (gated-namespace aggregation) ==='
 
