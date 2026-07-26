@@ -6,7 +6,8 @@
   One command for local use and CI. Uses dotnet-coverage (a profiler-based collector, decoupled from
   the test framework) to produce a single merged Cobertura over the whole solution's test run, then
   ReportGenerator for the human-readable report + JSON summary, then build/coverage-gate.ps1 to
-  enforce the per-assembly floors. A test failure and a gate breach both yield a non-zero exit.
+  enforce the per-assembly floors. A test failure and a gate breach both yield a non-zero exit; a
+  test failure additionally prints the per-test detail the collector otherwise swallows.
   Runs on Windows PowerShell 5.1 (local) and PowerShell 7 (CI / pwsh).
 .PARAMETER NoBuild
   Skip the solution build (assume the binaries are already current — e.g. CI built in a prior step).
@@ -17,6 +18,27 @@ $ErrorActionPreference = 'Stop'
 # Don't let native-command non-zero exits throw under PS7's opt-in behaviour; we steer on $LASTEXITCODE
 # so a failing test run still produces a report before we surface the failure. (No-op on 5.1.)
 $PSNativeCommandUseErrorActionPreference = $false
+
+# dotnet-coverage runs `dotnet test` as a profiled child and relays only its summary lines, so a red
+# run names a TestResults log rather than the test that failed. Print that detail where whoever is
+# reading a failing job already is. Each test project writes one UTF-16 log under its
+# bin/<config>/<tfm>/TestResults/; the signal is the `failed <test>` blocks and the run summary, so
+# the periodic `[+n/xn/?n]` progress lines and blank padding are dropped. Only runs *proven* green
+# are skipped, so a crashed or truncated run still gets printed rather than silently swallowed.
+function Write-TestFailureDetail($RepoRoot) {
+  $logs = @(Get-ChildItem -Path (Join-Path $RepoRoot '*/bin/*/*/TestResults/*.log') -File -ErrorAction SilentlyContinue)
+  if ($logs.Count -eq 0) {
+    Write-Host "No TestResults logs found — cannot report which test failed." -ForegroundColor Yellow
+    return
+  }
+  foreach ($log in $logs) {
+    $lines = @(Get-Content $log.FullName)
+    if ($lines | Where-Object { $_ -like 'Test run summary: Passed!*' }) { continue }
+    Write-Host ""
+    Write-Host "── $($log.FullName) ──" -ForegroundColor Yellow
+    $lines | Where-Object { $_ -notmatch '^\[\+' -and $_.Trim() -ne '' } | ForEach-Object { Write-Host $_ }
+  }
+}
 
 $repoRoot = Split-Path $PSScriptRoot -Parent
 Push-Location $repoRoot
@@ -54,6 +76,8 @@ try {
   $gateExit = $LASTEXITCODE
 
   if ($testExit -ne 0) {
+    Write-TestFailureDetail $repoRoot
+    Write-Host ""
     Write-Host "NOTE: the test run reported failures (exit $testExit); the coverage figures above are from a non-green run." -ForegroundColor Yellow
     exit $testExit
   }
