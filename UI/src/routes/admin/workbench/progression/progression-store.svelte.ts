@@ -22,7 +22,7 @@ import {
 	renumberTiers,
 	tiersOfPath
 } from './progression-helpers';
-import { NO_SKILL, type WorkbenchPath, type WorkbenchProficiency } from './types';
+import { NO_SKILL } from './types';
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
@@ -40,10 +40,12 @@ const nowIso = () => new Date().toISOString();
  * save that resolves new path ids before the proficiencies that reference them.
  */
 export class ProgressionStore {
-	paths = $state<WorkbenchPath[]>([]);
-	profs = $state<WorkbenchProficiency[]>([]);
-	private basePaths = $state<WorkbenchPath[]>([]);
-	private baseProfs = $state<WorkbenchProficiency[]>([]);
+	/** A path's ordered tiers are the `profs` carrying its id; it declares the single activity key it trains on. */
+	paths = $state<IPath[]>([]);
+	/** Each tier's level modifiers/rewards and prerequisites ride along and save through their dedicated relationship endpoints. */
+	profs = $state<IProficiency[]>([]);
+	private basePaths = $state<IPath[]>([]);
+	private baseProfs = $state<IProficiency[]>([]);
 
 	loaded = $state(false);
 	saving = $state(false);
@@ -95,15 +97,15 @@ export class ProgressionStore {
 	// ── Baselines / diffing ──
 
 	// Plain Record lookups (not Map) so the reactive-class lint stays happy, mirroring EntityStore.
-	private basePathMap = $derived.by<Record<number, WorkbenchPath>>(() => {
-		const map: Record<number, WorkbenchPath> = {};
+	private basePathMap = $derived.by<Record<number, IPath>>(() => {
+		const map: Record<number, IPath> = {};
 		for (const p of this.basePaths) {
 			map[p.id] = p;
 		}
 		return map;
 	});
-	private baseProfMap = $derived.by<Record<number, WorkbenchProficiency>>(() => {
-		const map: Record<number, WorkbenchProficiency> = {};
+	private baseProfMap = $derived.by<Record<number, IProficiency>>(() => {
+		const map: Record<number, IProficiency> = {};
 		for (const p of this.baseProfs) {
 			map[p.id] = p;
 		}
@@ -117,8 +119,8 @@ export class ProgressionStore {
 	 * here (unlike EntityStore) — this store has no soft-delete side channel that can flip a status
 	 * without also replacing the record's reference.
 	 */
-	private pathStateCache = new WeakMap<WorkbenchPath, RecordStatus>();
-	private profStateCache = new WeakMap<WorkbenchProficiency, RecordStatus>();
+	private pathStateCache = new WeakMap<IPath, RecordStatus>();
+	private profStateCache = new WeakMap<IProficiency, RecordStatus>();
 
 	private pathStatuses = $derived.by<Record<number, RecordStatus>>(() => {
 		const map: Record<number, RecordStatus> = {};
@@ -148,8 +150,8 @@ export class ProgressionStore {
 	});
 
 	private pathDiff = $derived.by(() => {
-		const added: WorkbenchPath[] = [];
-		const modified: { record: WorkbenchPath; baseline: WorkbenchPath }[] = [];
+		const added: IPath[] = [];
+		const modified: { record: IPath; baseline: IPath }[] = [];
 		for (const path of this.paths) {
 			if (this.pathStatuses[path.id] === 'added') {
 				added.push(path);
@@ -160,8 +162,8 @@ export class ProgressionStore {
 		return { added, modified };
 	});
 	private profDiff = $derived.by(() => {
-		const added: WorkbenchProficiency[] = [];
-		const modified: { record: WorkbenchProficiency; baseline: WorkbenchProficiency }[] = [];
+		const added: IProficiency[] = [];
+		const modified: { record: IProficiency; baseline: IProficiency }[] = [];
 		for (const prof of this.profs) {
 			if (this.profStatuses[prof.id] === 'added') {
 				added.push(prof);
@@ -192,12 +194,12 @@ export class ProgressionStore {
 	});
 
 	/** Always called with a record from {@link paths}, which {@link pathStatuses} covers exhaustively. */
-	pathStatus(path: WorkbenchPath): RecordStatus {
+	pathStatus(path: IPath): RecordStatus {
 		return this.pathStatuses[path.id];
 	}
 
 	/** Always called with a record from {@link profs}, which {@link profStatuses} covers exhaustively. */
-	profStatus(prof: WorkbenchProficiency): RecordStatus {
+	profStatus(prof: IProficiency): RecordStatus {
 		return this.profStatuses[prof.id];
 	}
 
@@ -205,25 +207,25 @@ export class ProgressionStore {
 		return record.retiredAt != null;
 	}
 
-	pathBaseline(id: number): WorkbenchPath | undefined {
+	pathBaseline(id: number): IPath | undefined {
 		return this.basePathMap[id];
 	}
 
-	profBaseline(id: number): WorkbenchProficiency | undefined {
+	profBaseline(id: number): IProficiency | undefined {
 		return this.baseProfMap[id];
 	}
 
 	// ── Derived selection ──
 
-	get selectedPath(): WorkbenchPath | undefined {
+	get selectedPath(): IPath | undefined {
 		return this.paths.find((p) => p.id === this.selectedPathId);
 	}
 
-	get currentTiers(): WorkbenchProficiency[] {
+	get currentTiers(): IProficiency[] {
 		return this.selectedPathId == null ? [] : tiersOfPath(this.profs, this.selectedPathId);
 	}
 
-	get drilledTier(): WorkbenchProficiency | undefined {
+	get drilledTier(): IProficiency | undefined {
 		return this.drilledTierId == null ? undefined : this.profs.find((p) => p.id === this.drilledTierId);
 	}
 
@@ -266,7 +268,7 @@ export class ProgressionStore {
 	 * reseed from server truth or land as a "clean" record whose dirty indicator never fires — so
 	 * every mutator no-ops while {@link saving} is true rather than risk either.
 	 */
-	patchPath(id: number, mutate: (draft: WorkbenchPath) => void) {
+	patchPath(id: number, mutate: (draft: IPath) => void) {
 		if (this.saving) {
 			return;
 		}
@@ -281,7 +283,7 @@ export class ProgressionStore {
 		this.#saveFlash.reset();
 	}
 
-	patchProf(id: number, mutate: (draft: WorkbenchProficiency) => void) {
+	patchProf(id: number, mutate: (draft: IProficiency) => void) {
 		if (this.saving) {
 			return;
 		}
@@ -535,17 +537,11 @@ export class ProgressionStore {
 			// edit. Scoped to exactly the profs where the removal actually clears the violation; a shrink
 			// that leaves an offending payout in place still reaches the identity edit unsplit, so the
 			// backend correctly rejects it (see #1827/#1804).
-			const shrinksPastPersistedPayout = ({
-				record,
-				baseline
-			}: {
-				record: WorkbenchProficiency;
-				baseline: WorkbenchProficiency;
-			}) => {
+			const shrinksPastPersistedPayout = ({ record, baseline }: { record: IProficiency; baseline: IProficiency }) => {
 				if (record.maxLevel >= baseline.maxLevel) {
 					return false;
 				}
-				const payoutLevel = (prof: WorkbenchProficiency) =>
+				const payoutLevel = (prof: IProficiency) =>
 					[...prof.levelModifiers, ...prof.levelRewards].map((row) => row.level);
 				const persistedOffends = payoutLevel(baseline).some((level) => level > record.maxLevel);
 				const stillOffends = payoutLevel(record).some((level) => level > record.maxLevel);
@@ -595,7 +591,7 @@ export class ProgressionStore {
 			);
 
 			// 5. Proficiency identities — remap a (possibly brand-new) path id into each DTO.
-			const toProfDto = (prof: WorkbenchProficiency) => ({
+			const toProfDto = (prof: IProficiency) => ({
 				...profIdentityDto(prof),
 				pathId: resolveId(prof.pathId, pathIdMap)
 			});
@@ -793,12 +789,12 @@ export class ProgressionStore {
 	 * surfaces).
 	 */
 	private async rebaseAfterPartialFailure(recovery: {
-		pathDiff: { added: WorkbenchPath[]; modified: { record: WorkbenchPath; baseline: WorkbenchPath }[] };
+		pathDiff: { added: IPath[]; modified: { record: IPath; baseline: IPath }[] };
 		profDiff: {
-			added: WorkbenchProficiency[];
-			modified: { record: WorkbenchProficiency; baseline: WorkbenchProficiency }[];
+			added: IProficiency[];
+			modified: { record: IProficiency; baseline: IProficiency }[];
 		};
-		baseProfMap: Record<number, WorkbenchProficiency>;
+		baseProfMap: Record<number, IProficiency>;
 		pathIdMap: Map<number, number>;
 		profIdMap: Map<number, number>;
 		pathIdentityWritten: boolean;

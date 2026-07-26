@@ -2,13 +2,13 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, screen } from '@testing-library/svelte';
 
 import GatewaysEditor from '$routes/admin/workbench/progression/GatewaysEditor.svelte';
-import type { WorkbenchPath, WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
+import type { IPath, IProficiency } from '$lib/api';
 import { asStore, path, tier } from './progression-test-utils';
 
 afterEach(cleanup);
 
 // A fake store exposing exactly what GatewaysEditor reads/calls.
-const makeStore = (profs: WorkbenchProficiency[], paths: WorkbenchPath[] = []) =>
+const makeStore = (profs: IProficiency[], paths: IPath[] = []) =>
 	asStore({
 		profs,
 		paths,

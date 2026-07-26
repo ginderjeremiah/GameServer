@@ -46,7 +46,7 @@ import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import WordOfPower from '$components/WordOfPower.svelte';
 import type { ProgressionStore } from './progression-store.svelte';
 import { tiersOfPath } from './progression-helpers';
-import type { WorkbenchProficiency } from './types';
+import type { IProficiency } from '$lib/api';
 
 interface Props {
 	store: ProgressionStore;
@@ -57,7 +57,7 @@ const { store, pathId }: Props = $props();
 
 const tiers = $derived(tiersOfPath(store.profs, pathId));
 
-const metaFor = (tier: WorkbenchProficiency): string => {
+const metaFor = (tier: IProficiency): string => {
 	const milestones = tier.levelRewards.length;
 	const gated = tier.prerequisiteIds.length > 0 ? ' · gated ✦' : '';
 	return `cap ${tier.maxLevel} · ${milestones} ${milestones === 1 ? 'milestone' : 'milestones'}${gated}`;

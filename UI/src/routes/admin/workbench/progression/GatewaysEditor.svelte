@@ -48,12 +48,12 @@
 <script lang="ts">
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import type { ProgressionStore } from './progression-store.svelte';
-import type { WorkbenchProficiency } from './types';
+import type { IProficiency } from '$lib/api';
 import ProgSelect from './ProgSelect.svelte';
 
 interface Props {
 	store: ProgressionStore;
-	tier: WorkbenchProficiency;
+	tier: IProficiency;
 }
 
 const { store, tier }: Props = $props();

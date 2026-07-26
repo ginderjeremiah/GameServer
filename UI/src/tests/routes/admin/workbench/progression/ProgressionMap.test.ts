@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import ProgressionMap from '$routes/admin/workbench/progression/ProgressionMap.svelte';
 import type { ProgressionStore } from '$routes/admin/workbench/progression/progression-store.svelte';
-import type { WorkbenchPath, WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
+import type { IPath, IProficiency } from '$lib/api';
 import { mapPath as path, mapTier as tier } from './progression-test-utils';
 
 // jsdom has no ResizeObserver; the map observes its container on mount.
@@ -16,7 +16,7 @@ beforeAll(() => {
 	(globalThis as unknown as { ResizeObserver: typeof ResizeObserverStub }).ResizeObserver = ResizeObserverStub;
 });
 
-const makeStore = (paths: WorkbenchPath[], profs: WorkbenchProficiency[]) =>
+const makeStore = (paths: IPath[], profs: IProficiency[]) =>
 	({ paths, profs, selectPath: vi.fn(), drillTier: vi.fn() }) as unknown as ProgressionStore & {
 		selectPath: ReturnType<typeof vi.fn>;
 		drillTier: ReturnType<typeof vi.fn>;

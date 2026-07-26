@@ -116,12 +116,12 @@ import {
 import WordOfPower from '$components/WordOfPower.svelte';
 import type { ProgressionStore } from './progression-store.svelte';
 import { decipherThresholds } from './progression-helpers';
-import type { WorkbenchProficiency } from './types';
+import type { IProficiency } from '$lib/api';
 import ProgInput from './ProgInput.svelte';
 
 interface Props {
 	store: ProgressionStore;
-	tier: WorkbenchProficiency;
+	tier: IProficiency;
 }
 
 const { store, tier }: Props = $props();

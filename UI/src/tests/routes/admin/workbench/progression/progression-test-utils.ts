@@ -1,7 +1,6 @@
 import { vi } from 'vitest';
-import { EActivityKey } from '$lib/api';
+import { EActivityKey, type IPath, type IProficiency } from '$lib/api';
 import type { ProgressionStore } from '$routes/admin/workbench/progression/progression-store.svelte';
-import type { WorkbenchPath, WorkbenchProficiency } from '$routes/admin/workbench/progression/types';
 import { makePath, makeProficiency } from '../../../../fixtures/proficiencies';
 
 /* Shared scaffolding for the progression editor's component suites (#2405). Each suite still declares
@@ -63,7 +62,7 @@ export const resetStores = () => {
 };
 
 /** Base path fixture — id 5, the path the detail suites open. */
-export const path = (over: Partial<WorkbenchPath> = {}): WorkbenchPath =>
+export const path = (over: Partial<IPath> = {}): IPath =>
 	makePath({ id: 5, name: 'Fire Path', activityKey: EActivityKey.Fire, ...over });
 
 /**
@@ -77,7 +76,7 @@ export const path = (over: Partial<WorkbenchPath> = {}): WorkbenchPath =>
  * A suite whose assertions depend on a different identity (TierDetail's populated conlang strings, say)
  * wraps this with its own defaults rather than changing them here; those divergences are load-bearing.
  */
-export const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProficiency =>
+export const tier = (over: Partial<IProficiency> = {}): IProficiency =>
 	makeProficiency({
 		id: 0,
 		name: 'Blades',
@@ -99,14 +98,10 @@ export const tier = (over: Partial<WorkbenchProficiency> = {}): WorkbenchProfici
    detail suites' `Fire Path`/`Fire` only to override both straight back. `mapTier` does go through `tier`,
    because it wants that builder's blank conlang fields. */
 
-export const mapPath = (id: number, over: Partial<WorkbenchPath> = {}): WorkbenchPath => makePath({ id, ...over });
+export const mapPath = (id: number, over: Partial<IPath> = {}): IPath => makePath({ id, ...over });
 
-export const mapTier = (
-	id: number,
-	pathId: number,
-	ordinal: number,
-	over: Partial<WorkbenchProficiency> = {}
-): WorkbenchProficiency => tier({ id, name: `Tier ${id}`, pathId, pathOrdinal: ordinal, ...over });
+export const mapTier = (id: number, pathId: number, ordinal: number, over: Partial<IProficiency> = {}): IProficiency =>
+	tier({ id, name: `Tier ${id}`, pathId, pathOrdinal: ordinal, ...over });
 
 /**
  * Casts a partial fake to the store the components read. The suites drive these rather than the real
@@ -115,7 +110,7 @@ export const mapTier = (
 export const asStore = (shape: Record<string, unknown>) => shape as unknown as ProgressionStore;
 
 /** A fake store exposing what the path-identity surfaces (`PathDetail`, its retire flow) read. */
-export const makePathStore = (selectedPath: WorkbenchPath, overrides: Record<string, unknown> = {}) =>
+export const makePathStore = (selectedPath: IPath, overrides: Record<string, unknown> = {}) =>
 	asStore({
 		selectedPath,
 		profs: [],
@@ -135,7 +130,7 @@ export const makePathStore = (selectedPath: WorkbenchPath, overrides: Record<str
 	});
 
 /** A fake store exposing what `TierDetail` and its tab bodies read. */
-export const makeTierStore = (drilledTier: WorkbenchProficiency, overrides: Record<string, unknown> = {}) =>
+export const makeTierStore = (drilledTier: IProficiency, overrides: Record<string, unknown> = {}) =>
 	asStore({
 		drilledTier,
 		profs: [drilledTier],

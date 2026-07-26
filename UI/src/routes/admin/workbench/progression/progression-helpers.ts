@@ -1,14 +1,13 @@
-import type { IProficiencyLevelModifier, IProficiencyLevelReward } from '$lib/api';
+import type { IPath, IProficiency, IProficiencyLevelModifier, IProficiencyLevelReward } from '$lib/api';
 import { EActivityKey, EAttribute, EModifierType, ESkillAcquisition } from '$lib/api';
 import { activityKeyDisplay, hasFlag, type ActivityKeyKind } from '$lib/common';
 import { staticData } from '$stores';
 import type { SelectOption } from '../entities/types';
-import type { WorkbenchPath, WorkbenchProficiency } from './types';
 
 // ── Factories ──
 
 /** A new, unsaved path keyed on physical damage by default (the author then picks its activity key). */
-export const newPath = (id: number): WorkbenchPath => ({
+export const newPath = (id: number): IPath => ({
 	id,
 	name: '',
 	description: '',
@@ -46,7 +45,7 @@ export const activityKeyGroups: SelectOptionGroup[] = (() => {
 })();
 
 /** A new, unsaved proficiency (path tier) with the strawman cap/curve defaults. */
-export const newProficiency = (id: number, pathId: number, pathOrdinal: number): WorkbenchProficiency => ({
+export const newProficiency = (id: number, pathId: number, pathOrdinal: number): IProficiency => ({
 	id,
 	name: '',
 	description: '',
@@ -68,15 +67,15 @@ export const newProficiency = (id: number, pathId: number, pathOrdinal: number):
 // ── Tier layout ──
 
 /** A path's tiers, ascending by ordinal. */
-export const tiersOfPath = (profs: WorkbenchProficiency[], pathId: number): WorkbenchProficiency[] =>
+export const tiersOfPath = (profs: IProficiency[], pathId: number): IProficiency[] =>
 	profs.filter((p) => p.pathId === pathId).sort((a, b) => a.pathOrdinal - b.pathOrdinal);
 
 /** Reassign contiguous 0..n-1 ordinals to a list already in the desired display order. */
-export const renumberTiers = (orderedTiers: WorkbenchProficiency[]): WorkbenchProficiency[] =>
+export const renumberTiers = (orderedTiers: IProficiency[]): IProficiency[] =>
 	orderedTiers.map((tier, index) => ({ ...tier, pathOrdinal: index }));
 
 /** True when two tiers in the list share an ordinal — the collision the backend rejects. */
-export const hasTierCollision = (tiers: WorkbenchProficiency[]): boolean => {
+export const hasTierCollision = (tiers: IProficiency[]): boolean => {
 	const seen = new Set<number>();
 	for (const tier of tiers) {
 		if (seen.has(tier.pathOrdinal)) {
@@ -119,7 +118,7 @@ export const decipherThresholds = (maxLevel: number): { pronunciation: number; t
 // ── Milestone (payout) projection over the two backend collections ──
 
 /** Levels that carry a payout (a modifier and/or a reward), ascending. */
-export const payoutLevels = (prof: WorkbenchProficiency): number[] => {
+export const payoutLevels = (prof: IProficiency): number[] => {
 	const levels = new Set<number>();
 	for (const modifier of prof.levelModifiers) {
 		levels.add(modifier.level);
@@ -130,14 +129,14 @@ export const payoutLevels = (prof: WorkbenchProficiency): number[] => {
 	return [...levels].sort((a, b) => a - b);
 };
 
-export const modifiersAtLevel = (prof: WorkbenchProficiency, level: number): IProficiencyLevelModifier[] =>
+export const modifiersAtLevel = (prof: IProficiency, level: number): IProficiencyLevelModifier[] =>
 	prof.levelModifiers.filter((modifier) => modifier.level === level);
 
-export const rewardAtLevel = (prof: WorkbenchProficiency, level: number): IProficiencyLevelReward | undefined =>
+export const rewardAtLevel = (prof: IProficiency, level: number): IProficiencyLevelReward | undefined =>
 	prof.levelRewards.find((reward) => reward.level === level);
 
 /** A level is a "milestone" when it grants a reward skill (vs. a plain per-level attribute bonus). */
-export const isMilestoneLevel = (prof: WorkbenchProficiency, level: number): boolean =>
+export const isMilestoneLevel = (prof: IProficiency, level: number): boolean =>
 	rewardAtLevel(prof, level) !== undefined;
 
 /** A blank attribute modifier for a new payout row. */
@@ -150,7 +149,7 @@ export const blankModifier = (level: number): IProficiencyLevelModifier => ({
 
 // ── Validation (mirrors the backend's named rejections so the editor flags before saving) ──
 
-export const pathWarnings = (path: WorkbenchPath): string[] => {
+export const pathWarnings = (path: IPath): string[] => {
 	const warnings: string[] = [];
 	if (!path.name.trim()) {
 		warnings.push('Missing name');
@@ -165,7 +164,7 @@ export const pathWarnings = (path: WorkbenchPath): string[] => {
  * root tier off ordinal 0 without ever touching prerequisiteIds, so this must be checked against the
  * about-to-be-saved pathOrdinal, not just at the point prerequisites are edited.
  */
-export const prerequisiteRootWarnings = (prof: WorkbenchProficiency): string[] =>
+export const prerequisiteRootWarnings = (prof: IProficiency): string[] =>
 	prof.pathOrdinal !== 0 && prof.prerequisiteIds.length > 0 ? ['Prerequisites are only allowed on a root tier'] : [];
 
 /**
@@ -174,7 +173,7 @@ export const prerequisiteRootWarnings = (prof: WorkbenchProficiency): string[] =
  * still-persisted payout) or FindLevelOutOfRange (SetModifiers/SetRewards, against the tier's saved
  * MaxLevel) — so it feeds {@link proficiencyBlockingWarnings}, unlike the rest of {@link proficiencyWarnings}.
  */
-export const levelRangeWarnings = (prof: WorkbenchProficiency): string[] => {
+export const levelRangeWarnings = (prof: IProficiency): string[] => {
 	const warnings: string[] = [];
 	for (const modifier of prof.levelModifiers) {
 		if (modifier.level < 0 || modifier.level > prof.maxLevel) {
@@ -197,7 +196,7 @@ export const levelRangeWarnings = (prof: WorkbenchProficiency): string[] => {
  * skill-pool flag guards. The reward picker (reference.playerSkillOptions) keeps such a skill
  * visible via its `keep` exception, so this is the backstop that surfaces the drift.
  */
-export const rewardSkillFlagWarnings = (prof: WorkbenchProficiency): string[] => {
+export const rewardSkillFlagWarnings = (prof: IProficiency): string[] => {
 	const warnings: string[] = [];
 	for (const reward of prof.levelRewards) {
 		const skill = staticData.skills?.[reward.rewardSkillId];
@@ -209,7 +208,7 @@ export const rewardSkillFlagWarnings = (prof: WorkbenchProficiency): string[] =>
 	return warnings;
 };
 
-export const proficiencyWarnings = (prof: WorkbenchProficiency): string[] => {
+export const proficiencyWarnings = (prof: IProficiency): string[] => {
 	const warnings: string[] = [];
 	if (!prof.name.trim()) {
 		warnings.push('Missing name');
@@ -241,7 +240,7 @@ export const proficiencyWarnings = (prof: WorkbenchProficiency): string[] => {
  * `AdminProficiencies` rejects them, so gating Save on them would block a save the backend would
  * actually accept.
  */
-export const proficiencyBlockingWarnings = (prof: WorkbenchProficiency): string[] => [
+export const proficiencyBlockingWarnings = (prof: IProficiency): string[] => [
 	...levelRangeWarnings(prof),
 	...prerequisiteRootWarnings(prof),
 	...rewardSkillFlagWarnings(prof)
@@ -249,7 +248,7 @@ export const proficiencyBlockingWarnings = (prof: WorkbenchProficiency): string[
 
 // ── Persisted DTOs (identity-level Add/Edit; child collections go through their own endpoints) ──
 
-export const pathIdentityDto = (path: WorkbenchPath) => ({
+export const pathIdentityDto = (path: IPath) => ({
 	id: path.id,
 	name: path.name,
 	description: path.description,
@@ -258,7 +257,7 @@ export const pathIdentityDto = (path: WorkbenchPath) => ({
 	retiredAt: path.retiredAt
 });
 
-export const profIdentityDto = (prof: WorkbenchProficiency) => ({
+export const profIdentityDto = (prof: IProficiency) => ({
 	id: prof.id,
 	name: prof.name,
 	description: prof.description,
