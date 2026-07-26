@@ -715,9 +715,9 @@ namespace Game.Application.Services
         }
 
         // Projects proficiency progress to the battle-snapshot's level-only view. Duplicated (not shared) in
-        // OfflineProgressService, which derives it from the progress aggregate it already loaded rather than
-        // through this lean accessor — like ResolveClass below, a three-line, dependency-only projection not
-        // worth a shared abstraction (CLAUDE.md).
+        // OfflineProgressService, which derives it from the progress aggregate it already loaded and also
+        // carries Xp (the offline sim accrues from it; the live snapshot only needs levels) — like ResolveClass
+        // below, a dependency-only projection not worth a shared abstraction (CLAUDE.md).
         private static List<ProficiencyLevelSnapshot> ToProficiencyLevels(IEnumerable<PlayerProficiency> proficiencies) =>
             proficiencies
                 .Select(p => new ProficiencyLevelSnapshot { ProficiencyId = p.ProficiencyId, Level = p.Level })
