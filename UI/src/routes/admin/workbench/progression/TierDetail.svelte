@@ -66,6 +66,7 @@
 {/if}
 
 <script lang="ts">
+import type { IProficiency } from '$lib/api';
 import { childChanged } from '../save-helpers';
 import { referenceSourcesFromStatic, retireWithConfirm } from '../retire-confirm';
 import type { ProgressionStore, TierTab } from './progression-store.svelte';
@@ -80,7 +81,6 @@ import ConlangIdentity from './ConlangIdentity.svelte';
 import XpCurve from './XpCurve.svelte';
 import MilestonesEditor from './MilestonesEditor.svelte';
 import GatewaysEditor from './GatewaysEditor.svelte';
-import type { IProficiency } from '$lib/api';
 
 interface Props {
 	store: ProgressionStore;

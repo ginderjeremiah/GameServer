@@ -117,6 +117,9 @@ export const decipherThresholds = (maxLevel: number): { pronunciation: number; t
 
 // ── Milestone (payout) projection over the two backend collections ──
 
+/** The "no skill" sentinel for the milestone reward-skill select (-1 ⇒ no skill chosen / cleared). */
+export const NO_SKILL = -1;
+
 /** Levels that carry a payout (a modifier and/or a reward), ascending. */
 export const payoutLevels = (prof: IProficiency): number[] => {
 	const levels = new Set<number>();

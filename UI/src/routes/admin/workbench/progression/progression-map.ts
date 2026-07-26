@@ -1,5 +1,5 @@
-import { tiersOfPath } from './progression-helpers';
 import type { IPath, IProficiency } from '$lib/api';
+import { tiersOfPath } from './progression-helpers';
 
 /** A tier rendered as a node in a path column of the cross-path Map view. */
 export interface MapNode {

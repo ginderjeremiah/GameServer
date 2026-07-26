@@ -42,11 +42,11 @@
 </div>
 
 <script lang="ts">
+import type { IProficiency } from '$lib/api';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import WordOfPower from '$components/WordOfPower.svelte';
 import type { ProgressionStore } from './progression-store.svelte';
 import { tiersOfPath } from './progression-helpers';
-import type { IProficiency } from '$lib/api';
 
 interface Props {
 	store: ProgressionStore;

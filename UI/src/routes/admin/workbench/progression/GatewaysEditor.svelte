@@ -46,9 +46,9 @@
 {/if}
 
 <script lang="ts">
+import type { IProficiency } from '$lib/api';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import type { ProgressionStore } from './progression-store.svelte';
-import type { IProficiency } from '$lib/api';
 import ProgSelect from './ProgSelect.svelte';
 
 interface Props {

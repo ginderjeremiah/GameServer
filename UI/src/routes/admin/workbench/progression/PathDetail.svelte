@@ -71,6 +71,7 @@
 {/if}
 
 <script lang="ts">
+import type { IPath } from '$lib/api';
 import {
 	PATH_DESCRIPTION_MAX_LENGTH,
 	PATH_DESIGNER_NOTES_MAX_LENGTH,
@@ -79,7 +80,6 @@ import {
 import { denseByLiveId, referenceSourcesFromStatic, retireWithConfirm } from '../retire-confirm';
 import type { ProgressionStore, PathTab } from './progression-store.svelte';
 import { activityKeyGroups, hasTierCollision, pathWarnings } from './progression-helpers';
-import type { IPath } from '$lib/api';
 import DetailHeader from '../components/DetailHeader.svelte';
 import ProgInput from './ProgInput.svelte';
 import ProgSelect from './ProgSelect.svelte';

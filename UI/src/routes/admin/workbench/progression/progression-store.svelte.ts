@@ -16,13 +16,13 @@ import {
 	blankModifier,
 	newPath,
 	newProficiency,
+	NO_SKILL,
 	pathIdentityDto,
 	proficiencyBlockingWarnings,
 	profIdentityDto,
 	renumberTiers,
 	tiersOfPath
 } from './progression-helpers';
-import { NO_SKILL } from './types';
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 

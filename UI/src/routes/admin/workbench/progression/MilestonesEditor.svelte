@@ -104,12 +104,11 @@
 </div>
 
 <script lang="ts">
+import type { IProficiency } from '$lib/api';
 import WorkbenchIcon from '../WorkbenchIcon.svelte';
 import { reference } from '../reference.svelte';
 import type { ProgressionStore } from './progression-store.svelte';
-import { cumulativeXp, isMilestoneLevel, modifiersAtLevel, rewardAtLevel } from './progression-helpers';
-import type { IProficiency } from '$lib/api';
-import { NO_SKILL } from './types';
+import { cumulativeXp, isMilestoneLevel, modifiersAtLevel, NO_SKILL, rewardAtLevel } from './progression-helpers';
 import ProgSelect from './ProgSelect.svelte';
 import ProgNumber from './ProgNumber.svelte';
 import AttributePicker from '../components/AttributePicker.svelte';
