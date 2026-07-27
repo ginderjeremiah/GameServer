@@ -292,6 +292,13 @@ The counter is persisted in each aggregate's cached representation (`PlayerCache
 the progress hash), so it survives reconnects and instance migration — the cases that matter. On a **cold
 DB load** (cache miss) it is seeded from the player's highest `LastAppliedSequence`.
 
+**That `MAX` is scoped to the streams the aggregate itself produces**, not an unscoped per-player maximum:
+`Player` seeds from `PlayerCore` plus the equipment/mod streams, `PlayerProgress` from `Progress`. The two
+own deliberately separate counter spaces, and seeding both from one shared maximum — while *safe*, since it
+is still monotonic and merely skips values — would make each counter jump on the other aggregate's traffic,
+contradicting that separation and reading as a bug to whoever hits it. `COALESCE(MAX(…), 0)`, so a player
+with no watermark rows yet starts at 0 and stamps 1.
+
 That seed is correct whenever the queue has drained, which is the only way a cache miss normally happens:
 the miss means the player was dormant past the multi-hour key TTL, and the *TTL ≫ max queue-drain time*
 invariant means their events drained long ago. The residual gap is a cache key lost (eviction under
@@ -305,13 +312,28 @@ if it ever proves real.
 
 | Issue | Scope | Status |
 |---|---|---|
-| [#2473](https://github.com/ginderjeremiah/GameServer/issues/2473) | Carry a per-player write sequence on the envelope and the producing aggregates | **Shipped** (#2492) |
-| [#2474](https://github.com/ginderjeremiah/GameServer/issues/2474) | Add `PlayerWriteWatermark` and guard the absolute-value handlers against stale writes | Open |
-| [#2475](https://github.com/ginderjeremiah/GameServer/issues/2475) | Retire `_parkedPlayerLanes` once the sequence guard makes the deferral redundant | Open, blocked on #2474 |
+| [#2473](https://github.com/ginderjeremiah/GameServer/issues/2473) | Carry a per-player write sequence on the envelope and the producing aggregates | **Shipped** (#2492), minus the cold-load seed |
+| [#2474](https://github.com/ginderjeremiah/GameServer/issues/2474) | Add `PlayerWriteWatermark` and guard the absolute-value handlers against stale writes | Part (a) **shipped** (#2494): the table, the guard helper, rejection accounting, `PlayerCore` + `Progress` |
+| [#2495](https://github.com/ginderjeremiah/GameServer/issues/2495) | Part (b) — guard the equipment and mod handlers (dual-key, tombstone) | Open |
+| [#2496](https://github.com/ginderjeremiah/GameServer/issues/2496) | Part (c) — guard the remaining single-row handlers | Open |
+| [#2500](https://github.com/ginderjeremiah/GameServer/issues/2500) | Seed the counter from the persisted watermark on a cold load | Open — **live lost-write path** |
+| [#2475](https://github.com/ginderjeremiah/GameServer/issues/2475) | Retire `_parkedPlayerLanes` once the guard covers every handler | Open, blocked on #2495 + #2496 |
 
-The producer half is live: `DomainEventEnvelope.Sequence` carries the stamp with `Unsequenced = 0` as an
-explicit sentinel constant, and `Player.AdvanceWriteSequence()` pre-increments so a cold-loaded aggregate's
-first stamp is 1. Nothing reads the stamp until #2474, so the hazard is still open.
+The stamp is live and now read: `DomainEventEnvelope.Sequence` carries it with `Unsequenced = 0` as an
+explicit sentinel constant, `Player.AdvanceWriteSequence()` pre-increments so a cold-loaded aggregate's
+first stamp is 1, and #2494's guard consumes it for the core and progress streams.
+
+**The cold-load seed specified above is *not* live**, and that matters more now that the guard reads the
+stamp. #2473 deferred it deliberately — the table holding the watermarks didn't exist yet, and nothing
+consumed the stamp, so a cold load reseeding from 0 was harmless. #2494 removed that precondition. Until
+#2500 lands, a returning player whose cache lapsed reseeds at 0, stamps 1, and has every guarded write
+rejected against their own previous high-water mark: self-healing for `PlayerCore` (absolute, so a later
+save repairs it) but **permanent for progress rows touched only inside that window**, since those carry
+only a save's dirty set and are never re-dirtied.
+
+The lesson worth carrying: that deferral was recorded only in two code comments and in neither this table
+nor #2474's body, which is precisely why it survived into a shipped guard. A deferral that crosses an issue
+boundary belongs in the artifact the next implementer reads.
 
 ## Aside: where the original assumption eroded
 
