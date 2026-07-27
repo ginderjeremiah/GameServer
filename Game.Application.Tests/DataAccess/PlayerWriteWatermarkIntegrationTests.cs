@@ -27,6 +27,10 @@ namespace Game.Application.Tests.DataAccess
         // TestDataSeeder.CreatePlayerAsync's default, asserted where a rolled-back apply must leave the row as seeded.
         private const int SeededLevel = 5;
 
+        // Enough concurrent applies that several pass their existence check before any insert commits, so the
+        // guard's restart is exercised rather than only the uncontended path. Mirrors the idempotency suite.
+        private const int Parallelism = 8;
+
         // Fixed so a lesson's ReadAt is asserted as an offset from a known instant rather than from "now".
         private static readonly DateTime LessonUnlockedAt = new(2026, 7, 16, 8, 0, 0, DateTimeKind.Utc);
 
@@ -607,6 +611,76 @@ namespace Game.Application.Tests.DataAccess
 
             Assert.Equal(0, rejected);
             Assert.False(await ReadLogPreferenceAsync(playerId, ELogType.Damage));
+        }
+
+        [Fact]
+        public async Task GuardedItemFavorite_RacingItsUnguardedUnlockSibling_ConvergesWithoutThrowing()
+        {
+            var playerId = await SeedPlayerAsync();
+            var itemId = await SeedItemAsync();
+
+            // The five handlers guarded here lost their own unique-violation catches, so the guard's restart is
+            // now the only thing absorbing a concurrent insert. Two sequenced applies of the same target can't
+            // collide (they queue on the watermark row), so the race that still reaches the data row is against
+            // the *unguarded* insert-if-missing sibling, which bypasses the watermark entirely.
+            await RaceAsync(
+                () => ApplyAsync(new ItemFavoriteChangedEvent(playerId, itemId, Favorite: true), sequence: 4),
+                () => ApplyAsync(new ItemUnlockedEvent(playerId, itemId), sequence: DomainEventEnvelope.Unsequenced));
+
+            Assert.True(await ReadFavoriteAsync(playerId, itemId));
+            Assert.Equal(1, await CountUnlockedItemsAsync(playerId, itemId));
+            Assert.Equal(4, await ReadWatermarkAsync(playerId, PlayerWriteStream.ItemFavorite, ItemTarget(itemId)));
+        }
+
+        [Fact]
+        public async Task GuardedLessonRead_RacingItsUnguardedUnlockSibling_ConvergesWithoutThrowing()
+        {
+            var playerId = await SeedPlayerAsync();
+            var lessonId = await SeedLessonAsync();
+
+            // The other apply shape: an update-first fast path whose miss falls through to an insert, so the
+            // sibling's row can land in the window between them. The restart re-runs the update, which finds it.
+            await RaceAsync(
+                () => ApplyAsync(ReadLesson(playerId, lessonId, readAtMinute: 5), sequence: 4),
+                () => ApplyAsync(new LessonUnlockedEvent(playerId, lessonId, LessonUnlockedAt), sequence: DomainEventEnvelope.Unsequenced));
+
+            Assert.Equal(LessonUnlockedAt.AddMinutes(5), await ReadLessonReadAtAsync(playerId, lessonId));
+            Assert.Equal(4, await ReadWatermarkAsync(playerId, PlayerWriteStream.LessonRead, LessonTarget(lessonId)));
+        }
+
+        [Fact]
+        public async Task GuardedSelectedSkills_RacingItsUnguardedUnlockSibling_ConvergesWithoutThrowing()
+        {
+            var playerId = await SeedPlayerAsync();
+            var skillId = await SeedSkillAsync();
+
+            // The multi-row shape: the rebuild inserts a row for a loadout skill whose SkillUnlockedEvent
+            // hasn't been applied yet, which is exactly the row the sibling is racing it to insert.
+            await RaceAsync(
+                () => ApplyAsync(new SelectedSkillsChangedEvent(playerId, [skillId]), sequence: 4),
+                () => ApplyAsync(new SkillUnlockedEvent(playerId, skillId), sequence: DomainEventEnvelope.Unsequenced));
+
+            Assert.Equal([skillId], await ReadSelectedSkillIdsAsync(playerId));
+            Assert.Equal(4, await ReadWatermarkAsync(playerId, PlayerWriteStream.SelectedSkills, PlayerWriteWatermarkGuard.PlayerScopedTarget));
+        }
+
+        /// <summary>
+        /// Runs both applies <see cref="Parallelism"/> times each, all at once, so several pass their
+        /// existence check before any insert commits. Whether the violation actually happens is a timing
+        /// race — the assertions are on convergence, which must hold either way — so this is a probabilistic
+        /// guard on top of <c>GuardedApply_UniqueViolationInsideTheTransaction_…</c>, which forces the same
+        /// restart deterministically.
+        /// </summary>
+        private static Task RaceAsync(Func<Task<int>> guarded, Func<Task<int>> unguardedSibling)
+            => Task.WhenAll(Enumerable.Range(0, Parallelism)
+                .Select(i => i % 2 == 0 ? guarded() : unguardedSibling()));
+
+        private async Task<int> CountUnlockedItemsAsync(int playerId, int itemId)
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            return await context.UnlockedItems.AsNoTracking()
+                .CountAsync(ui => ui.PlayerId == playerId && ui.ItemId == itemId, CancellationToken);
         }
 
         // A separate scope means a separate GameContext on its own connection, so this commits independently

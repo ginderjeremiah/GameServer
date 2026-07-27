@@ -7,12 +7,10 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
 {
     internal sealed class AttributeAllocationsChangedHandler(PlayerWriteWatermarkGuard guard) : IPlayerUpdateHandler<AttributeAllocationsChangedEvent>
     {
-        // Absolute writes over the player's whole allocation spread, so a stale replay would durably revert
-        // spent stat points while Player.StatPointsUsed may already hold the newer value — the two then
-        // disagree until the player reallocates. One player-scoped target: the event carries the complete
-        // spread rather than a dirty subset (Player.TryUpdateAttributes projects every allocation), so there
-        // is nothing finer for a per-attribute key to protect. The guard owns the transaction, the context the
-        // write must be issued on, and the unique-violation restart the load-then-upsert below needs.
+        // A stale replay durably reverts spent stat points while Player.StatPointsUsed may already hold the
+        // newer value, leaving the two disagreeing until the player reallocates. Player-scoped — see
+        // PlayerWriteStream.AttributeAllocations. The guard owns the transaction, the context the write must
+        // be issued on, and the unique-violation restart the load-then-upsert below needs.
         public Task HandleAsync(AttributeAllocationsChangedEvent evt)
             => guard.ExecuteGuardedAsync(
                 evt.PlayerId,

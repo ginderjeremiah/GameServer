@@ -1,4 +1,3 @@
-using System.Globalization;
 using Game.Core.Players.Events;
 using Game.Infrastructure.Database;
 using Game.Infrastructure.Entities;
@@ -8,15 +7,12 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
 {
     internal sealed class ItemFavoriteChangedHandler(PlayerWriteWatermarkGuard guard) : IPlayerUpdateHandler<ItemFavoriteChangedEvent>
     {
-        // Keyed per item: each event carries one item's flag, so a per-player key would discard an older
-        // change to item A merely because a newer change to item B landed first. Formatted invariantly
-        // because the key is a persisted comparison key — a culture that renders digits differently would
-        // write a second watermark row and the guard would silently stop seeing the first.
+        // Keyed per item — see PlayerWriteStream.ItemFavorite for why that granularity is the contract.
         public Task HandleAsync(ItemFavoriteChangedEvent evt)
             => guard.ExecuteGuardedAsync(
                 evt.PlayerId,
                 PlayerWriteStream.ItemFavorite,
-                [evt.ItemId.ToString(CultureInfo.InvariantCulture)],
+                [PlayerWriteWatermarkGuard.Target(evt.ItemId)],
                 (context, _) => ApplyAsync(context, evt));
 
         private static async Task ApplyAsync(GameContext context, ItemFavoriteChangedEvent evt)

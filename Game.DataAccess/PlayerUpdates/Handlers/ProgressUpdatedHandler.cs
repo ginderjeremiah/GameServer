@@ -9,16 +9,13 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
         // Keyed per row rather than per player: a progress event carries only a save's dirty rows, so a
         // per-player watermark would let a newer event covering statistic Y reject an older event carrying an
         // entirely different, still-current statistic X — silently losing writes on the game's highest-volume
-        // persistence path. The kind prefix keeps the three row families from colliding in one key space, and
-        // the ids are formatted invariantly because the key is a persisted comparison key — a culture that
-        // renders digits differently would write a second watermark row and the guard would silently stop
-        // seeing the first.
+        // persistence path. The kind prefix keeps the three row families from colliding in one key space.
         private static string StatisticTarget(CachedPlayerStatistic stat)
-            => FormattableString.Invariant($"stat:{stat.StatisticTypeId}:{stat.EntityId}");
+            => PlayerWriteWatermarkGuard.Target("stat", stat.StatisticTypeId, stat.EntityId);
         private static string ChallengeTarget(CachedPlayerChallenge challenge)
-            => FormattableString.Invariant($"challenge:{challenge.ChallengeId}");
+            => PlayerWriteWatermarkGuard.Target("challenge", challenge.ChallengeId);
         private static string ProficiencyTarget(CachedPlayerProficiency proficiency)
-            => FormattableString.Invariant($"prof:{proficiency.ProficiencyId}");
+            => PlayerWriteWatermarkGuard.Target("prof", proficiency.ProficiencyId);
 
         public Task HandleAsync(ProgressUpdatedEvent evt)
         {

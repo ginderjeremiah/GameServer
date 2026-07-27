@@ -7,11 +7,9 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
 {
     internal sealed class SelectedSkillsChangedHandler(PlayerWriteWatermarkGuard guard) : IPlayerUpdateHandler<SelectedSkillsChangedEvent>
     {
-        // The apply rebuilds every one of the player's Selected/Order columns from the event's full ordered
-        // loadout, so a stale replay durably restores a loadout the player has already replaced. The target is
-        // the loadout as a unit — a per-skill key would let the rows of one event partially win, leaving a
-        // loadout that was never actually selected (a skill deselected by the newer event but re-Selected by
-        // the older one's rebuild). The guard owns the transaction, the context, and the restart.
+        // The apply rebuilds every one of the player's Selected/Order columns, so a stale replay durably
+        // restores a loadout the player has already replaced. Keyed on the loadout as a unit — see
+        // PlayerWriteStream.SelectedSkills. The guard owns the transaction, the context, and the restart.
         public Task HandleAsync(SelectedSkillsChangedEvent evt)
             => guard.ExecuteGuardedAsync(
                 evt.PlayerId,

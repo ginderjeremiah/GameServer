@@ -1,4 +1,3 @@
-using System.Globalization;
 using Game.Core.Players.Events;
 using Game.Infrastructure.Database;
 using Game.Infrastructure.Entities;
@@ -8,14 +7,12 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
 {
     internal sealed class LessonReadHandler(PlayerWriteWatermarkGuard guard) : IPlayerUpdateHandler<LessonReadEvent>
     {
-        // Keyed per lesson, for the same reason as the log-preference stream: each event carries one lesson's
-        // read state, so a per-player key would discard an older lesson's read merely because a newer one
-        // landed first. Formatted invariantly because the key is a persisted comparison key.
+        // Keyed per lesson — see PlayerWriteStream.LessonRead for why that granularity is the contract.
         public Task HandleAsync(LessonReadEvent evt)
             => guard.ExecuteGuardedAsync(
                 evt.PlayerId,
                 PlayerWriteStream.LessonRead,
-                [evt.LessonId.ToString(CultureInfo.InvariantCulture)],
+                [PlayerWriteWatermarkGuard.Target(evt.LessonId)],
                 (context, _) => ApplyAsync(context, evt));
 
         private static async Task ApplyAsync(GameContext context, LessonReadEvent evt)
