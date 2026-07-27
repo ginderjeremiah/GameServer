@@ -15,10 +15,18 @@ namespace Game.DataAccess.PlayerUpdates
     {
         /// <summary>
         /// The producing aggregate's write sequence for the envelope being applied, or
-        /// <see cref="DomainEventEnvelope.Unsequenced"/> when it carries none (#2473). No handler reads it yet
-        /// — the guard that rejects a write older than its target's watermark is #2474.
+        /// <see cref="DomainEventEnvelope.Unsequenced"/> when it carries none (#2473). Read by
+        /// <see cref="PlayerWriteWatermarkGuard"/>, which rejects a write older than its target's watermark.
         /// </summary>
         public long Sequence { get; private set; } = DomainEventEnvelope.Unsequenced;
+
+        /// <summary>
+        /// How many of this envelope's write targets <see cref="PlayerWriteWatermarkGuard"/> skipped as
+        /// already superseded. Reported (not just dropped) so a genuine reordering storm — or a bug in the
+        /// sequencing itself — is observable on a path whose whole purpose is never to silently lose a write;
+        /// <see cref="DataProviderSynchronizer"/> reads it after each apply and totals it per drain pass.
+        /// </summary>
+        public int RejectedTargetCount { get; private set; }
 
         /// <summary>
         /// Populates the context from the envelope about to be applied. One method rather than a setter per
@@ -29,6 +37,16 @@ namespace Game.DataAccess.PlayerUpdates
         public void Describe(DomainEventEnvelope envelope)
         {
             Sequence = envelope.Sequence;
+        }
+
+        /// <summary>
+        /// Records that the guard skipped <paramref name="count"/> of this envelope's targets as superseded.
+        /// Additive so a handler that passes through the guard more than once in a single apply totals rather
+        /// than overwrites.
+        /// </summary>
+        public void RecordRejectedTargets(int count)
+        {
+            RejectedTargetCount += count;
         }
     }
 }
