@@ -4,30 +4,37 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Game.DataAccess.PlayerUpdates.Handlers
 {
-    internal sealed class ProgressUpdatedHandler(GameContext context) : IPlayerUpdateHandler<ProgressUpdatedEvent>
+    internal sealed class ProgressUpdatedHandler(PlayerWriteWatermarkGuard guard) : IPlayerUpdateHandler<ProgressUpdatedEvent>
     {
-        public async Task HandleAsync(ProgressUpdatedEvent evt)
+        // Keyed per row rather than per player: a progress event carries only a save's dirty rows, so a
+        // per-player watermark would let a newer event covering statistic Y reject an older event carrying an
+        // entirely different, still-current statistic X — silently losing writes on the game's highest-volume
+        // persistence path. The kind prefix keeps the three row families from colliding in one key space.
+        private static string StatisticTarget(CachedPlayerStatistic stat) => $"stat:{stat.StatisticTypeId}:{stat.EntityId}";
+        private static string ChallengeTarget(CachedPlayerChallenge challenge) => $"challenge:{challenge.ChallengeId}";
+        private static string ProficiencyTarget(CachedPlayerProficiency proficiency) => $"prof:{proficiency.ProficiencyId}";
+
+        public Task HandleAsync(ProgressUpdatedEvent evt)
         {
-            // The load-then-upsert isn't atomic, so a concurrent apply of the same at-least-once event can
-            // insert a row between our load and save. On the resulting unique violation, clear and re-run
-            // once: the now-existing rows load as updates, so the second pass carries no conflicting insert.
-            // A second failure propagates to the queue's retry policy rather than looping here.
-            try
-            {
-                await ApplyAsync(evt);
-            }
-            catch (DbUpdateException ex) when (ex.IsUniqueViolation())
-            {
-                context.ChangeTracker.Clear();
-                await ApplyAsync(evt);
-            }
+            var targets = evt.Statistics.Select(StatisticTarget)
+                .Concat(evt.Challenges.Select(ChallengeTarget))
+                .Concat(evt.Proficiencies.Select(ProficiencyTarget))
+                .ToList();
+
+            // The guard owns the transaction and the unique-violation restart the load-then-upsert below needs
+            // (a concurrent apply of the same at-least-once event can insert a row between the load and the
+            // save), so this handler only has to write the rows it was handed — through the context the guard
+            // passes it, which is the one its transaction covers.
+            return guard.ExecuteGuardedAsync(evt.PlayerId, PlayerWriteStream.Progress, targets, (context, accepted) => ApplyAsync(context, evt, accepted));
         }
 
-        private async Task ApplyAsync(ProgressUpdatedEvent evt)
+        private static async Task ApplyAsync(GameContext context, ProgressUpdatedEvent evt, IReadOnlySet<string> accepted)
         {
             // Absolute upserts so re-applying the event under the retry policy converges to the same state.
             // Batched like the attribute-allocations handler: load the touched rows, set/insert, save once.
-            if (evt.Statistics.Count > 0)
+            // Only the accepted targets are written — the rest are already superseded by a newer event.
+            var statistics = evt.Statistics.Where(s => accepted.Contains(StatisticTarget(s))).ToList();
+            if (statistics.Count > 0)
             {
                 // Bound the load by the touched type id set AND the touched entity id set — their
                 // cross-product, which is a superset of the exact (type, entity) pairs changed. Filtering on
@@ -37,8 +44,8 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
                 // pragmatic narrowing; the exact-key match still happens in memory below. entityIds includes
                 // null for the global rows — EF turns Contains over a List<int?> into
                 // "EntityId IN (...) OR EntityId IS NULL".
-                var typeIds = evt.Statistics.Select(s => s.StatisticTypeId).Distinct().ToList();
-                var entityIds = evt.Statistics.Select(s => s.EntityId).Distinct().ToList();
+                var typeIds = statistics.Select(s => s.StatisticTypeId).Distinct().ToList();
+                var entityIds = statistics.Select(s => s.EntityId).Distinct().ToList();
                 var existing = await context.PlayerStatistics
                     .Where(ps => ps.PlayerId == evt.PlayerId
                         && typeIds.Contains(ps.StatisticTypeId)
@@ -48,7 +55,7 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
                 // against a stray duplicate row throwing here and poisoning this player's progress stream.
                 var byKey = existing.ToFirstByKey(ps => (ps.StatisticTypeId, ps.EntityId));
 
-                foreach (var stat in evt.Statistics)
+                foreach (var stat in statistics)
                 {
                     if (byKey.TryGetValue((stat.StatisticTypeId, stat.EntityId), out var row))
                     {
@@ -67,9 +74,10 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
                 }
             }
 
-            if (evt.Challenges.Count > 0)
+            var challenges = evt.Challenges.Where(c => accepted.Contains(ChallengeTarget(c))).ToList();
+            if (challenges.Count > 0)
             {
-                var challengeIds = evt.Challenges.Select(c => c.ChallengeId).ToList();
+                var challengeIds = challenges.Select(c => c.ChallengeId).ToList();
                 var existing = await context.PlayerChallenges
                     .Where(pc => pc.PlayerId == evt.PlayerId && challengeIds.Contains(pc.ChallengeId))
                     .ToListAsync();
@@ -77,7 +85,7 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
                 // makes a duplicate impossible, but ToFirstByKey keeps a stray duplicate from poisoning it.
                 var byId = existing.ToFirstByKey(pc => pc.ChallengeId);
 
-                foreach (var challenge in evt.Challenges)
+                foreach (var challenge in challenges)
                 {
                     if (byId.TryGetValue(challenge.ChallengeId, out var row))
                     {
@@ -99,9 +107,10 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
                 }
             }
 
-            if (evt.Proficiencies.Count > 0)
+            var proficiencies = evt.Proficiencies.Where(p => accepted.Contains(ProficiencyTarget(p))).ToList();
+            if (proficiencies.Count > 0)
             {
-                var proficiencyIds = evt.Proficiencies.Select(p => p.ProficiencyId).ToList();
+                var proficiencyIds = proficiencies.Select(p => p.ProficiencyId).ToList();
                 var existing = await context.PlayerProficiencies
                     .Where(pp => pp.PlayerId == evt.PlayerId && proficiencyIds.Contains(pp.ProficiencyId))
                     .ToListAsync();
@@ -109,7 +118,7 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
                 // makes a duplicate impossible, but ToFirstByKey keeps a stray duplicate from poisoning it.
                 var byId = existing.ToFirstByKey(pp => pp.ProficiencyId);
 
-                foreach (var proficiency in evt.Proficiencies)
+                foreach (var proficiency in proficiencies)
                 {
                     if (byId.TryGetValue(proficiency.ProficiencyId, out var row))
                     {

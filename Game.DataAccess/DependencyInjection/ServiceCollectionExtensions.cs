@@ -145,6 +145,9 @@ namespace Game.DataAccess.DependencyInjection
                 // Envelope-level metadata for the event currently being applied, populated per drain scope by
                 // PlayerUpdateEventDispatcher so handlers can read it without widening their signature (#2473).
                 .AddScoped<PlayerUpdateContext>()
+                // Runs a guarded handler's apply behind its targets' watermarks so a stale write is skipped
+                // rather than durably regressing the row (#2474).
+                .AddScoped<PlayerWriteWatermarkGuard>()
                 // Per-event persistence handlers the DataProviderSynchronizer applies on the consume side.
                 .AddPlayerUpdateHandlers();
         }

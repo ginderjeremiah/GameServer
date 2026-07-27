@@ -53,6 +53,7 @@ namespace Game.Infrastructure.Database
         public DbSet<PlayerProficiency> PlayerProficiencies { get; set; }
         public DbSet<PlayerSkill> PlayerSkills { get; set; }
         public DbSet<PlayerStatistic> PlayerStatistics { get; set; }
+        public DbSet<PlayerWriteWatermark> PlayerWriteWatermarks { get; set; }
         public DbSet<Rarity> Rarities { get; set; }
         public DbSet<Role> Roles { get; set; }
         public DbSet<Skill> Skills { get; set; }
@@ -458,6 +459,23 @@ namespace Game.Infrastructure.Database
 
                 entity.Property(c => c.Value)
                     .HasPrecision(36, 3);
+            });
+
+            modelBuilder.Entity<PlayerWriteWatermark>(entity =>
+            {
+                // The composite natural key is what makes the guard work: its unique index is the row lock the
+                // conditional upsert takes before the data write, so concurrent applies of the same player's
+                // events serialize per target instead of racing to commit last (#2474).
+                entity.HasKey(w => new { w.PlayerId, w.Stream, w.TargetKey });
+
+                // Bounded so the key stays index-friendly; the widest authored key is a statistic's
+                // "stat:{typeId}:{entityId}" pair, which is far shorter.
+                entity.Property(w => w.TargetKey)
+                    .HasMaxLength(64);
+
+                // Deliberately no Player navigation or FK: this is drain metadata that must outlive the rows
+                // it guards (the ModRemoved tombstone case), and an FK would turn an apply for an absent
+                // player — today a silent zero-row no-op — into a violation the drain dead-letters.
             });
 
             modelBuilder.Entity<Rarity>(entity =>
