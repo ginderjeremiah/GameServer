@@ -26,6 +26,13 @@ namespace Game.Application.Tests.DataAccess
         // TestDataSeeder.CreatePlayerAsync's default, asserted where a rolled-back apply must leave the row as seeded.
         private const int SeededLevel = 5;
 
+        private const int Helm = (int)EEquipmentSlot.HelmSlot;
+        private const int Chest = (int)EEquipmentSlot.ChestSlot;
+
+        // The prerequisites a ModAppliedEvent assumes already exist, plus a second mod so a re-apply can be
+        // told apart from a no-op rather than only from a row count.
+        private sealed record ModFixture(int PlayerId, int ItemId, int SlotId, int FirstModId, int SecondModId);
+
         public PlayerWriteWatermarkIntegrationTests(IntegrationTestContainers containers, ITestOutputHelper testOutputHelper)
             : base(containers, testOutputHelper) { }
 
@@ -270,6 +277,294 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(4, await ReadWatermarkAsync(playerId, PlayerWriteStream.Progress, target));
         }
 
+        [Fact]
+        public async Task ItemEquipped_NewerSequence_AppliesAndAdvancesBothTheItemAndTheSlotWatermarks()
+        {
+            var (playerId, itemId) = await SeedUnlockedItemAsync();
+
+            var rejected = await ApplyAsync(new ItemEquippedEvent(playerId, itemId, Helm), sequence: 2);
+
+            Assert.Equal(0, rejected);
+            Assert.Equal(Helm, await ReadEquippedSlotAsync(playerId, itemId));
+            // An equip writes two identities at once, so it advances both — neither key is decorative.
+            Assert.Equal(2, await ReadWatermarkAsync(playerId, PlayerWriteStream.Equipment, PlayerWriteTargets.Equipment.Item(itemId)));
+            Assert.Equal(2, await ReadWatermarkAsync(playerId, PlayerWriteStream.Equipment, PlayerWriteTargets.Equipment.Slot(Helm)));
+        }
+
+        [Fact]
+        public async Task ItemEquipped_OlderEquipIntoASlotANewerEquipOwns_IsRejectedAndAdvancesNeitherWatermark()
+        {
+            var (playerId, incumbentId) = await SeedUnlockedItemAsync();
+            var challengerId = await SeedItemFor(playerId);
+
+            await ApplyAsync(new ItemEquippedEvent(playerId, incumbentId, Helm), sequence: 5);
+            var rejected = await ApplyAsync(new ItemEquippedEvent(playerId, challengerId, Helm), sequence: 3);
+
+            // The challenger's own item key has never been written, so it passes on its own; only the slot key
+            // sees that this equip is stale. Applying it anyway would durably strip the incumbent.
+            Assert.Equal(2, rejected);
+            Assert.Equal(Helm, await ReadEquippedSlotAsync(playerId, incumbentId));
+            Assert.Null(await ReadEquippedSlotAsync(playerId, challengerId));
+
+            // All-or-nothing: the passing key must not keep its advance. A watermark seeded at 3 with no write
+            // behind it would make a genuinely older event look already applied and drop it for good.
+            Assert.Null(await ReadWatermarkAsync(playerId, PlayerWriteStream.Equipment, PlayerWriteTargets.Equipment.Item(challengerId)));
+            Assert.Equal(5, await ReadWatermarkAsync(playerId, PlayerWriteStream.Equipment, PlayerWriteTargets.Equipment.Slot(Helm)));
+        }
+
+        [Fact]
+        public async Task ItemEquipped_ReplayedOlderEquipAfterTheItemMovedOn_IsRejectedByTheItemKey()
+        {
+            var (playerId, itemId) = await SeedUnlockedItemAsync();
+
+            await ApplyAsync(new ItemEquippedEvent(playerId, itemId, Helm), sequence: 2);
+            await ApplyAsync(new ItemEquippedEvent(playerId, itemId, Chest), sequence: 4);
+
+            // The move to Chest reassigned the item's own row, so it left the Helm watermark sitting at 2 —
+            // which accepts this replay. Only the item key, at 4, can see that the replay is stale, which is
+            // why the slot key alone would leave a hole: without it the replay drags the item back to Helm.
+            var rejected = await ApplyAsync(new ItemEquippedEvent(playerId, itemId, Helm), sequence: 3);
+
+            Assert.Equal(2, rejected);
+            Assert.Equal(Chest, await ReadEquippedSlotAsync(playerId, itemId));
+            Assert.Equal(2, await ReadWatermarkAsync(playerId, PlayerWriteStream.Equipment, PlayerWriteTargets.Equipment.Slot(Helm)));
+            Assert.Equal(4, await ReadWatermarkAsync(playerId, PlayerWriteStream.Equipment, PlayerWriteTargets.Equipment.Item(itemId)));
+        }
+
+        [Fact]
+        public async Task ItemEquipped_EqualSequence_Applies()
+        {
+            var (playerId, incumbentId) = await SeedUnlockedItemAsync();
+            var challengerId = await SeedItemFor(playerId);
+
+            await ApplyAsync(new ItemEquippedEvent(playerId, incumbentId, Helm), sequence: 4);
+            // Both keys are at 4 and the predicate is <=, so the same save's sibling equip still lands.
+            var rejected = await ApplyAsync(new ItemEquippedEvent(playerId, challengerId, Helm), sequence: 4);
+
+            Assert.Equal(0, rejected);
+            Assert.Equal(Helm, await ReadEquippedSlotAsync(playerId, challengerId));
+            Assert.Null(await ReadEquippedSlotAsync(playerId, incumbentId));
+        }
+
+        [Fact]
+        public async Task ItemEquipped_UnsequencedEvent_AppliesAgainstAdvancedWatermarksAndLeavesThemUnchanged()
+        {
+            var (playerId, incumbentId) = await SeedUnlockedItemAsync();
+            var challengerId = await SeedItemFor(playerId);
+
+            await ApplyAsync(new ItemEquippedEvent(playerId, incumbentId, Helm), sequence: 5);
+            var rejected = await ApplyAsync(new ItemEquippedEvent(playerId, challengerId, Helm), sequence: DomainEventEnvelope.Unsequenced);
+
+            Assert.Equal(0, rejected);
+            Assert.Equal(Helm, await ReadEquippedSlotAsync(playerId, challengerId));
+            Assert.Equal(5, await ReadWatermarkAsync(playerId, PlayerWriteStream.Equipment, PlayerWriteTargets.Equipment.Slot(Helm)));
+            Assert.Null(await ReadWatermarkAsync(playerId, PlayerWriteStream.Equipment, PlayerWriteTargets.Equipment.Item(challengerId)));
+        }
+
+        [Fact]
+        public async Task ItemUnequipped_OlderThanTheEquipThatFollowedIt_IsSkippedSoTheItemStaysWorn()
+        {
+            var (playerId, itemId) = await SeedUnlockedItemAsync();
+
+            await ApplyAsync(new ItemEquippedEvent(playerId, itemId, Helm), sequence: 6);
+
+            // An unequip carries no slot, so the item key is the only thing that can order it against the
+            // newer equip. Unguarded, this replay durably strips a worn item — and because Redis holds the
+            // correct state, nothing corrects the row until the player touches that slot again.
+            var rejected = await ApplyAsync(new ItemUnequippedEvent(playerId, itemId), sequence: 4);
+
+            Assert.Equal(1, rejected);
+            Assert.Equal(Helm, await ReadEquippedSlotAsync(playerId, itemId));
+            Assert.Equal(6, await ReadWatermarkAsync(playerId, PlayerWriteStream.Equipment, PlayerWriteTargets.Equipment.Item(itemId)));
+        }
+
+        [Fact]
+        public async Task ItemUnequipped_EqualThenNewerSequence_AppliesAndAdvancesTheItemWatermark()
+        {
+            var (playerId, itemId) = await SeedUnlockedItemAsync();
+
+            await ApplyAsync(new ItemEquippedEvent(playerId, itemId, Helm), sequence: 3);
+            // Equal first (the same save's sibling writes), then strictly newer.
+            Assert.Equal(0, await ApplyAsync(new ItemUnequippedEvent(playerId, itemId), sequence: 3));
+            Assert.Null(await ReadEquippedSlotAsync(playerId, itemId));
+
+            await ApplyAsync(new ItemEquippedEvent(playerId, itemId, Helm), sequence: 7);
+            var rejected = await ApplyAsync(new ItemUnequippedEvent(playerId, itemId), sequence: 8);
+
+            Assert.Equal(0, rejected);
+            Assert.Null(await ReadEquippedSlotAsync(playerId, itemId));
+            Assert.Equal(8, await ReadWatermarkAsync(playerId, PlayerWriteStream.Equipment, PlayerWriteTargets.Equipment.Item(itemId)));
+        }
+
+        [Fact]
+        public async Task ItemUnequipped_UnsequencedEvent_AppliesAgainstAnAdvancedWatermarkAndLeavesItUnchanged()
+        {
+            var (playerId, itemId) = await SeedUnlockedItemAsync();
+
+            await ApplyAsync(new ItemEquippedEvent(playerId, itemId, Helm), sequence: 6);
+            var rejected = await ApplyAsync(new ItemUnequippedEvent(playerId, itemId), sequence: DomainEventEnvelope.Unsequenced);
+
+            Assert.Equal(0, rejected);
+            Assert.Null(await ReadEquippedSlotAsync(playerId, itemId));
+            Assert.Equal(6, await ReadWatermarkAsync(playerId, PlayerWriteStream.Equipment, PlayerWriteTargets.Equipment.Item(itemId)));
+        }
+
+        [Fact]
+        public async Task ModApplied_OlderSequenceAfterNewer_IsSkippedAndLeavesTheWatermark()
+        {
+            var mods = await SeedModFixtureAsync();
+
+            await ApplyAsync(new ModAppliedEvent(mods.PlayerId, mods.ItemId, mods.SlotId, mods.SecondModId), sequence: 4);
+            var rejected = await ApplyAsync(new ModAppliedEvent(mods.PlayerId, mods.ItemId, mods.SlotId, mods.FirstModId), sequence: 2);
+
+            Assert.Equal(1, rejected);
+            Assert.Equal(mods.SecondModId, await ReadAppliedModAsync(mods.PlayerId, mods.ItemId, mods.SlotId));
+            Assert.Equal(4, await ReadWatermarkAsync(mods.PlayerId, PlayerWriteStream.Mods, PlayerWriteTargets.Mods.Slot(mods.ItemId, mods.SlotId)));
+        }
+
+        [Fact]
+        public async Task ModApplied_EqualThenNewerSequence_BothApplyAndTheWatermarkEndsAtTheNewest()
+        {
+            var mods = await SeedModFixtureAsync();
+
+            await ApplyAsync(new ModAppliedEvent(mods.PlayerId, mods.ItemId, mods.SlotId, mods.FirstModId), sequence: 3);
+            Assert.Equal(0, await ApplyAsync(new ModAppliedEvent(mods.PlayerId, mods.ItemId, mods.SlotId, mods.SecondModId), sequence: 3));
+            Assert.Equal(mods.SecondModId, await ReadAppliedModAsync(mods.PlayerId, mods.ItemId, mods.SlotId));
+
+            var rejected = await ApplyAsync(new ModAppliedEvent(mods.PlayerId, mods.ItemId, mods.SlotId, mods.FirstModId), sequence: 5);
+
+            Assert.Equal(0, rejected);
+            Assert.Equal(mods.FirstModId, await ReadAppliedModAsync(mods.PlayerId, mods.ItemId, mods.SlotId));
+            Assert.Equal(5, await ReadWatermarkAsync(mods.PlayerId, PlayerWriteStream.Mods, PlayerWriteTargets.Mods.Slot(mods.ItemId, mods.SlotId)));
+        }
+
+        [Fact]
+        public async Task ModApplied_UnsequencedEvent_AppliesAgainstAnAdvancedWatermarkAndLeavesItUnchanged()
+        {
+            var mods = await SeedModFixtureAsync();
+
+            await ApplyAsync(new ModAppliedEvent(mods.PlayerId, mods.ItemId, mods.SlotId, mods.SecondModId), sequence: 6);
+            var rejected = await ApplyAsync(new ModAppliedEvent(mods.PlayerId, mods.ItemId, mods.SlotId, mods.FirstModId), sequence: DomainEventEnvelope.Unsequenced);
+
+            Assert.Equal(0, rejected);
+            Assert.Equal(mods.FirstModId, await ReadAppliedModAsync(mods.PlayerId, mods.ItemId, mods.SlotId));
+            Assert.Equal(6, await ReadWatermarkAsync(mods.PlayerId, PlayerWriteStream.Mods, PlayerWriteTargets.Mods.Slot(mods.ItemId, mods.SlotId)));
+        }
+
+        [Fact]
+        public async Task ModApplied_StaleAfterANewerModRemoved_DoesNotResurrectTheMod()
+        {
+            var mods = await SeedModFixtureAsync();
+
+            await ApplyAsync(new ModAppliedEvent(mods.PlayerId, mods.ItemId, mods.SlotId, mods.FirstModId), sequence: 2);
+            await ApplyAsync(new ModRemovedEvent(mods.PlayerId, mods.ItemId, mods.SlotId), sequence: 5);
+
+            // This is why the watermark is a separate row rather than a version column on AppliedMod: the
+            // remove deleted the row the version would have lived on, so a stale apply would find nothing to
+            // compare against and put the mod back on an item the player has already stripped.
+            var rejected = await ApplyAsync(new ModAppliedEvent(mods.PlayerId, mods.ItemId, mods.SlotId, mods.SecondModId), sequence: 3);
+
+            Assert.Equal(1, rejected);
+            Assert.Null(await ReadAppliedModAsync(mods.PlayerId, mods.ItemId, mods.SlotId));
+            Assert.Equal(5, await ReadWatermarkAsync(mods.PlayerId, PlayerWriteStream.Mods, PlayerWriteTargets.Mods.Slot(mods.ItemId, mods.SlotId)));
+        }
+
+        [Fact]
+        public async Task ModRemoved_OlderThanTheApplyThatFollowedIt_IsSkippedSoTheModSurvives()
+        {
+            var mods = await SeedModFixtureAsync();
+
+            await ApplyAsync(new ModAppliedEvent(mods.PlayerId, mods.ItemId, mods.SlotId, mods.FirstModId), sequence: 7);
+            var rejected = await ApplyAsync(new ModRemovedEvent(mods.PlayerId, mods.ItemId, mods.SlotId), sequence: 4);
+
+            Assert.Equal(1, rejected);
+            Assert.Equal(mods.FirstModId, await ReadAppliedModAsync(mods.PlayerId, mods.ItemId, mods.SlotId));
+            Assert.Equal(7, await ReadWatermarkAsync(mods.PlayerId, PlayerWriteStream.Mods, PlayerWriteTargets.Mods.Slot(mods.ItemId, mods.SlotId)));
+        }
+
+        [Fact]
+        public async Task ModApplied_ToADifferentSlotOnTheSameItem_IsGuardedIndependently()
+        {
+            var mods = await SeedModFixtureAsync();
+            int otherSlotId;
+            using (var scope = CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+                otherSlotId = (await TestDataSeeder.AddItemModSlotAsync(context, mods.ItemId)).Id;
+            }
+
+            await ApplyAsync(new ModAppliedEvent(mods.PlayerId, mods.ItemId, mods.SlotId, mods.FirstModId), sequence: 6);
+
+            // Keyed per mod slot: an older event targeting a slot the newer one never touched is still current
+            // for that slot, so a coarser per-item (or per-player) key would silently drop it.
+            var rejected = await ApplyAsync(new ModAppliedEvent(mods.PlayerId, mods.ItemId, otherSlotId, mods.SecondModId), sequence: 2);
+
+            Assert.Equal(0, rejected);
+            Assert.Equal(mods.FirstModId, await ReadAppliedModAsync(mods.PlayerId, mods.ItemId, mods.SlotId));
+            Assert.Equal(mods.SecondModId, await ReadAppliedModAsync(mods.PlayerId, mods.ItemId, otherSlotId));
+        }
+
+        [Fact]
+        public async Task ItemEquipped_DifferentItemsRacingIntoOneSlotAtEqualSequences_ConvergesToASingleOccupant()
+        {
+            var (playerId, firstItemId) = await SeedUnlockedItemAsync();
+            var secondItemId = await SeedItemFor(playerId);
+
+            // The idempotency suite's version of this race runs unsequenced, so it bypasses the guard and has
+            // to swallow a DbUpdateException and rely on redelivery. Guarded, the two applies queue on the
+            // slot's watermark row and the vacate-then-place is atomic, so neither throws and the slot is never
+            // doubly occupied. Equal sequences so both pass the predicate and genuinely contend.
+            await ApplyConcurrentlyAsync(sequence: 3,
+                new ItemEquippedEvent(playerId, firstItemId, Helm),
+                new ItemEquippedEvent(playerId, secondItemId, Helm));
+
+            var slots = new[]
+            {
+                await ReadEquippedSlotAsync(playerId, firstItemId),
+                await ReadEquippedSlotAsync(playerId, secondItemId),
+            };
+            Assert.Single(slots, slot => slot == Helm);
+            Assert.Single(slots, slot => slot is null);
+        }
+
+        [Fact]
+        public async Task ModApplied_RacingAppliesToOneSlotAtEqualSequences_ConvergeToOneRow()
+        {
+            var mods = await SeedModFixtureAsync();
+
+            await ApplyConcurrentlyAsync(sequence: 3,
+                new ModAppliedEvent(mods.PlayerId, mods.ItemId, mods.SlotId, mods.FirstModId),
+                new ModAppliedEvent(mods.PlayerId, mods.ItemId, mods.SlotId, mods.SecondModId));
+
+            // Last writer wins, whichever that was; what must hold is that exactly one mod is on the slot and
+            // neither apply surfaced the primary-key violation to the queue.
+            var applied = await ReadAppliedModAsync(mods.PlayerId, mods.ItemId, mods.SlotId);
+            Assert.Contains(applied, new int?[] { mods.FirstModId, mods.SecondModId });
+            Assert.Equal(3, await ReadWatermarkAsync(mods.PlayerId, PlayerWriteStream.Mods, PlayerWriteTargets.Mods.Slot(mods.ItemId, mods.SlotId)));
+        }
+
+        // Applies the given events at one sequence through independent scopes at once, the cross-instance
+        // contention the watermark row is meant to serialize rather than merely detect.
+        private async Task ApplyConcurrentlyAsync<TEvent>(long sequence, params TEvent[] events)
+        {
+            var scopes = events.Select(_ => CreateScope()).ToList();
+            try
+            {
+                await Task.WhenAll(events.Zip(scopes, (evt, scope) => Task.Run(() =>
+                {
+                    DescribeSequence(scope, sequence);
+                    return scope.ServiceProvider.GetRequiredService<IPlayerUpdateHandler<TEvent>>().HandleAsync(evt);
+                })));
+            }
+            finally
+            {
+                foreach (var scope in scopes)
+                {
+                    scope.Dispose();
+                }
+            }
+        }
+
         // A separate scope means a separate GameContext on its own connection, so this commits independently
         // of the guard's in-flight transaction rather than joining it.
         private async Task InsertGlobalKillsFromAnotherScopeAsync(int playerId, decimal value)
@@ -377,6 +672,54 @@ namespace Game.Application.Tests.DataAccess
             var user = await TestDataSeeder.CreateUserAsync(context);
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
             return player.Id;
+        }
+
+        private async Task<int?> ReadEquippedSlotAsync(int playerId, int itemId)
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = await context.UnlockedItems.AsNoTracking()
+                .SingleAsync(ui => ui.PlayerId == playerId && ui.ItemId == itemId, CancellationToken);
+            return row.EquipmentSlotId;
+        }
+
+        private async Task<int?> ReadAppliedModAsync(int playerId, int itemId, int modSlotId)
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = await context.AppliedMods.AsNoTracking()
+                .SingleOrDefaultAsync(am => am.PlayerId == playerId && am.ItemId == itemId && am.ItemModSlotId == modSlotId, CancellationToken);
+            return row?.ItemModId;
+        }
+
+        private async Task<(int PlayerId, int ItemId)> SeedUnlockedItemAsync()
+        {
+            var playerId = await SeedPlayerAsync();
+            return (playerId, await SeedItemFor(playerId));
+        }
+
+        // Unlocked but unequipped, so a test's first equip is the write under test rather than seed state.
+        private async Task<int> SeedItemFor(int playerId)
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var itemId = (await TestDataSeeder.CreateItemAsync(context)).Id;
+            await TestDataSeeder.LinkItemToPlayerAsync(context, playerId, itemId);
+            return itemId;
+        }
+
+        private async Task<ModFixture> SeedModFixtureAsync()
+        {
+            var playerId = await SeedPlayerAsync();
+            var itemId = await SeedItemFor(playerId);
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var slotId = (await TestDataSeeder.AddItemModSlotAsync(context, itemId)).Id;
+            var firstModId = (await TestDataSeeder.CreateItemModAsync(context)).Id;
+            var secondModId = (await TestDataSeeder.CreateItemModAsync(context, name: "Second Mod")).Id;
+            await TestDataSeeder.LinkModToPlayerAsync(context, playerId, firstModId);
+            await TestDataSeeder.LinkModToPlayerAsync(context, playerId, secondModId);
+            return new ModFixture(playerId, itemId, slotId, firstModId, secondModId);
         }
 
         private async Task<int> SeedEnemyAsync()
