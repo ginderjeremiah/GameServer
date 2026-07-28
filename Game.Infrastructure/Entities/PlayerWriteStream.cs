@@ -1,10 +1,15 @@
 namespace Game.Infrastructure.Entities
 {
     /// <summary>
-    /// Identifies which write-behind handler a <see cref="PlayerWriteWatermark"/> row guards. One value per
-    /// guarded handler, so two handlers writing disjoint tables never contend on the same watermark row, and
-    /// the meaning of a stream's <see cref="PlayerWriteWatermark.TargetKey"/> is fixed by the handler that
-    /// owns it (see the per-stream key format on each member).
+    /// Identifies which write-behind target space a <see cref="PlayerWriteWatermark"/> row guards. One value
+    /// per space rather than per handler: handlers writing disjoint tables must never contend on the same
+    /// watermark row, but handlers writing the <em>same</em> rows must share a stream or they cannot order
+    /// against each other — a stale <c>ModApplied</c> is only rejected because <c>ModRemoved</c> advanced the
+    /// very watermark it compares against. The exception is handlers writing <em>disjoint columns</em> of a
+    /// shared row (<see cref="Equipment"/> and <see cref="ItemFavorite"/>), which stay separate because
+    /// ordering them against each other would reject writes that are not stale in any sense that matters. The
+    /// meaning of a stream's <see cref="PlayerWriteWatermark.TargetKey"/> is fixed by the stream (see the
+    /// format on each member).
     /// </summary>
     /// <remarks>
     /// Persisted as its numeric value, so the enum grows append-only and a member is never renumbered.
@@ -25,9 +30,24 @@ namespace Game.Infrastructure.Entities
         /// </summary>
         Progress = 1,
 
-        // 2 and 3 are reserved for the equipment and mod streams (#2495), which are in flight on their own
-        // branch. Two branches appending independently would otherwise both land on 2, and merging them would
-        // give one persisted value two meanings — the one mistake this enum's append-only rule exists to stop.
+        /// <summary>
+        /// The player's equipped-item slots (<c>ItemEquippedEvent</c>, <c>ItemUnequippedEvent</c>). Keyed on
+        /// both the item and the destination slot (<c>"item:{itemId}"</c>, <c>"slot:{slotId}"</c>) because an
+        /// equip writes two identities at once and either key alone leaves a hole: the slot key stops a
+        /// replayed older equip into a slot a newer one now owns, and the item key stops a replayed
+        /// <c>A→slot1</c> after A moved on to slot2 (which leaves slot1 untouched, so only the item key can
+        /// see it). Unequip involves no slot and carries the item key alone.
+        /// </summary>
+        Equipment = 2,
+
+        /// <summary>
+        /// The mods applied to a player's item mod slots (<c>ModAppliedEvent</c>, <c>ModRemovedEvent</c>),
+        /// keyed per mod slot (<c>"{itemId}:{modSlotId}"</c>) — the identity of the row both handlers write.
+        /// This is the stream the separate-row design exists for: <c>ModRemovedHandler</c> deletes its row
+        /// outright, so a per-row version column would go to the grave with it and a stale <c>ModApplied</c>
+        /// arriving afterwards would find nothing to compare against and resurrect the mod.
+        /// </summary>
+        Mods = 3,
 
         /// <summary>
         /// The player's equipped skill loadout (<c>SelectedSkillsChangedEvent</c>). Player-scoped — the event

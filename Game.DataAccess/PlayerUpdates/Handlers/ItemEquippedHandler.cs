@@ -5,43 +5,35 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Game.DataAccess.PlayerUpdates.Handlers
 {
-    internal sealed class ItemEquippedHandler(GameContext context) : IPlayerUpdateHandler<ItemEquippedEvent>
+    internal sealed class ItemEquippedHandler(PlayerWriteWatermarkGuard guard) : IPlayerUpdateHandler<ItemEquippedEvent>
     {
-        // Bounded re-attempts on a (player, slot) unique violation, mirroring UserLogins.SaveWithConflictRetry.
-        // Unlike ModAppliedHandler — whose conflict is the row it already owns (its key includes the slot),
-        // settled by a single ExecuteUpdate that can't re-violate — an equip must *evict a different item* from
-        // the destination slot, so the vacate and the place are two writes with an unavoidable window. A
-        // concurrent apply of the same at-least-once event, an ItemUnlockedEvent reordered behind this one, or a
-        // cross-instance writer can re-occupy the slot between the vacate and the save and re-trip the index, so
-        // the retry here genuinely can re-violate (ModAppliedHandler's cannot). Each pass re-vacates whoever won
-        // that race and re-places this item, so transient contention converges in-handler instead of burning the
-        // queue's coarser per-event attempt budget; a still-failing final attempt propagates to that queue
-        // retry/dead-letter backstop (at-least-once + idempotent handlers, so nothing is lost) rather than looping.
-        private const int MaxSaveAttempts = 3;
+        // Guarded on both the item and the destination slot, all-or-nothing: an equip is one indivisible
+        // change to two identities, and either key alone leaves a hole (see PlayerWriteStream.Equipment).
+        // Stamping the evicted occupant instead isn't an option — the vacate below is a single ExecuteUpdate
+        // precisely so no prior occupant is materialized, and ExecuteUpdate can't report the id it cleared.
+        //
+        // The guard also owns the transaction and the unique-violation restart the vacate-then-place needs.
+        // That replaces this handler's own bounded retry loop: same-player sequenced equips now queue behind
+        // each other on the slot's watermark row, so the cross-instance re-occupation that loop existed to
+        // absorb can no longer interleave here. What still can — an unsequenced envelope bypassing the guard,
+        // or a reordered ItemUnlockedEvent inserting the item's row — is a unique violation, and the guard's
+        // restart re-runs the whole apply (vacate included) against it. A still-failing restart propagates to
+        // the queue's retry/dead-letter backstop, exactly as the exhausted in-handler bound used to.
+        public Task HandleAsync(ItemEquippedEvent evt)
+            => guard.ExecuteGuardedAsync(
+                evt.PlayerId,
+                PlayerWriteStream.Equipment,
+                [PlayerWriteTargets.Equipment.Item(evt.ItemId), PlayerWriteTargets.Equipment.Slot(evt.SlotId)],
+                (context, _) => ApplyAsync(context, evt),
+                allTargetsRequired: true);
 
-        public async Task HandleAsync(ItemEquippedEvent evt)
-        {
-            for (var attempt = 1; ; attempt++)
-            {
-                try
-                {
-                    await ApplyAsync(evt);
-                    return;
-                }
-                catch (DbUpdateException ex) when (attempt < MaxSaveAttempts && ex.IsUniqueViolation())
-                {
-                    context.ChangeTracker.Clear();
-                }
-            }
-        }
-
-        private async Task ApplyAsync(ItemEquippedEvent evt)
+        private static async Task ApplyAsync(GameContext context, ItemEquippedEvent evt)
         {
             // Vacate the destination slot first with a single server-side statement — no prior occupant is
             // materialized into a snapshot a concurrent commit could tear, so the upsert below can't collide with
-            // it on the (player, slot) unique index. Mirrors ModAppliedHandler's clear-then-write. The clear and
-            // the upsert are separate commits, so a crash between them leaves the slot momentarily empty; the
-            // queue's reserve/acknowledge read redelivers the event and converges, so there is no lost write.
+            // it on the (player, slot) unique index. Both writes are inside the guard's transaction, so the slot
+            // is never observably empty between them and a crash rolls back to the pre-equip state rather than
+            // leaving it vacated.
             await context.UnlockedItems
                 .Where(ui => ui.PlayerId == evt.PlayerId && ui.EquipmentSlotId == evt.SlotId && ui.ItemId != evt.ItemId)
                 .ExecuteUpdateAsync(s => s.SetProperty(ui => ui.EquipmentSlotId, (int?)null));
