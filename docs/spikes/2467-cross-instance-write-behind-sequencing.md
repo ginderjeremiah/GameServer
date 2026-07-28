@@ -63,9 +63,9 @@ lock, atomic with the `LMOVE`), which reintroduces exactly the same-player cross
 fleet-shared marker would still block every same-player event reserved *after* the park, which is most of a
 long outage — it narrows the window rather than doing nothing, and that matters for #2475, which retires the
 instance-local marker because the guard makes it redundant, not because it never protected anything.
-**Sequencing is not merely the
-"obvious shape" — it is the only shape that is correct by construction**, because it makes the guard depend
-on the events' own relative age rather than on any instance observing another's state in time.
+**Sequencing is not merely the "obvious shape" — it is the only shape that is correct by construction**,
+because it makes the guard depend on the events' own relative age rather than on any instance observing
+another's state in time.
 
 ## Decisions
 
@@ -232,8 +232,9 @@ target within that stream (`""` for the genuinely player-scoped streams, `"stat:
 **Where a stream carries more than one *kind* of target, the key must be qualified by kind** — an item key
 and a slot key distinguished by their prefix, the exact spelling owned by the stream. The watermark row's
 identity is `(PlayerId, Stream, TargetKey)`, and the equipment stream keys on both an item and a slot
-(below), so bare ids would make **item 3 and slot 3 the same row**. Slot ids are small and dense and item ids start low, so that overlap is most of the low id
-range, not a corner case. Two things would break, both the failure this section rejects a per-player
+(below), so bare ids would make **item 3 and slot 3 the same row**. Slot ids are small and dense and item
+ids start low, so that overlap is most of the low id range, not a corner case. Two things would break, both
+the failure this section rejects a per-player
 watermark over: the dual-key check would silently collapse to a single key whenever `ItemId == SlotId` (the
 guard de-duplicates its key set, since `ON CONFLICT DO UPDATE` cannot affect one row twice in a statement),
 and equipping item 3 would advance the watermark that also guards slot 3, so a reordered older event
