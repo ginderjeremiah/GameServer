@@ -10,9 +10,12 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
         // per-player watermark would let a newer event covering statistic Y reject an older event carrying an
         // entirely different, still-current statistic X — silently losing writes on the game's highest-volume
         // persistence path. The kind prefix keeps the three row families from colliding in one key space.
-        private static string StatisticTarget(CachedPlayerStatistic stat) => $"stat:{stat.StatisticTypeId}:{stat.EntityId}";
-        private static string ChallengeTarget(CachedPlayerChallenge challenge) => $"challenge:{challenge.ChallengeId}";
-        private static string ProficiencyTarget(CachedPlayerProficiency proficiency) => $"prof:{proficiency.ProficiencyId}";
+        private static string StatisticTarget(CachedPlayerStatistic stat)
+            => PlayerWriteWatermarkGuard.Target("stat", stat.StatisticTypeId, stat.EntityId);
+        private static string ChallengeTarget(CachedPlayerChallenge challenge)
+            => PlayerWriteWatermarkGuard.Target("challenge", challenge.ChallengeId);
+        private static string ProficiencyTarget(CachedPlayerProficiency proficiency)
+            => PlayerWriteWatermarkGuard.Target("prof", proficiency.ProficiencyId);
 
         public Task HandleAsync(ProgressUpdatedEvent evt)
         {

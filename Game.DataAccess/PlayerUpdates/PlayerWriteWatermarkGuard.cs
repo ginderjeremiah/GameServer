@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using Game.Infrastructure.Database;
 using Game.Infrastructure.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -32,6 +34,39 @@ namespace Game.DataAccess.PlayerUpdates
         /// row itself and there is nothing finer to key on.
         /// </summary>
         public const string PlayerScopedTarget = "";
+
+        /// <summary>
+        /// Formats a target key from the ids that identify it, optionally prefixed by <paramref name="kind"/>
+        /// where one stream keys more than one row family. A <c>null</c> id renders as an empty segment —
+        /// how a global statistic's absent entity id is spelled.
+        /// </summary>
+        /// <remarks>
+        /// Callers go through this rather than interpolating because a target key is a <em>persisted
+        /// comparison key</em>: formatted under a culture whose numeric formatting differs (the negative sign,
+        /// in practice — CA1305), a caller would seed a second watermark row and the guard would silently stop
+        /// seeing the first. Same reasoning as handing the apply callback its <see cref="GameContext"/> — the
+        /// invariant is better held by the guard than by every caller's discipline.
+        /// </remarks>
+        public static string Target(string kind, params ReadOnlySpan<int?> ids)
+        {
+            var key = new StringBuilder(kind);
+            foreach (var id in ids)
+            {
+                key.Append(':');
+                if (id.HasValue)
+                {
+                    key.Append(id.Value.ToString(CultureInfo.InvariantCulture));
+                }
+            }
+
+            return key.ToString();
+        }
+
+        /// <summary>
+        /// Formats the target key of a stream whose targets are identified by a bare id, with no row family
+        /// to disambiguate. See the prefixed overload for why this isn't interpolated at the call site.
+        /// </summary>
+        public static string Target(int id) => id.ToString(CultureInfo.InvariantCulture);
 
         /// <summary>
         /// Advances the watermarks this event is allowed to advance and invokes <paramref name="applyAsync"/>

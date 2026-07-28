@@ -1,19 +1,10 @@
 import type { IZone } from '$lib/api';
 
-/* Shared `IZone` contract builder (#2434), following the `fixtures/skills.ts` / `fixtures/items.ts`
-   convention.
+/* Shared `IZone` contract builder (#2434). See `docs/frontend.md` → Testing Guidelines for the
+   contract-drift rule.
 
-   The target set is much narrower than the `grep "bossLevel:"` the issue proposed: only a suite that
-   constructs a *typed* `IZone` pays the contract-drift tax, and a throwaway required field on the
-   contract flushes out exactly nine suites plus the workbench's production `newItem`. Suites that
-   seed zone-shaped literals into an untyped `staticData` mock are excluded on purpose — they see no
-   new required field, and filling their previously-`undefined` fields could change what they render.
-   A `grep` still finding zone literals under `src/tests/` is expected, not a gap.
-
-   A builder that asserted a partial literal `as IZone` was invisible to that probe by construction —
-   the cast silences the missing field, so it kept compiling. #2447 folded those three in
-   (`challenge-unlocks`, `ChallengeTooltip`, `enemy-level`); reintroducing such a cast re-opens the
-   hole, so state why if you do. */
+   Excluded on purpose: the workbench's production `newItem`, and the suites seeding zone-shaped
+   literals into an untyped `staticData` mock. */
 
 /**
  * Builds an {@link IZone} reference-data entry for tests. Everything but the id is a neutral

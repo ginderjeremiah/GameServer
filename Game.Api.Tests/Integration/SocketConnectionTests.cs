@@ -297,7 +297,7 @@ namespace Game.Api.Tests.Integration
             var player = await playerService.LoadPlayer(playerId, CancellationToken);
             Assert.NotNull(player);
 
-            var reallocated = await playerService.TryUpdateAttributes(
+            var reallocated = await playerService.UpdateAttributes(
                 player,
                 [
                     new AttributeUpdate { AttributeId = (int)EAttribute.Strength, Amount = -10 },

@@ -24,7 +24,8 @@ vi.mock('$stores', () => ({ toastError: vi.fn() }));
 
 import SectionRenderer from '$routes/admin/workbench/components/SectionRenderer.svelte';
 import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
-import type { EntityConfig, Identified, SectionConfig } from '$routes/admin/workbench/entities/types';
+import type { Identified, SectionConfig } from '$routes/admin/workbench/entities/types';
+import { makeEntityConfig } from '../../../fixtures/workbench-config';
 
 // A record carrying every field the various section kinds read.
 const RECORD = {
@@ -41,19 +42,7 @@ const RECORD = {
 	progressGoal: 10
 };
 
-const config = (): EntityConfig<Identified> =>
-	({
-		key: 'rows',
-		label: 'Rows',
-		singular: 'Row',
-		glyph: 'box',
-		blankName: 'Unnamed',
-		newItem: (id: number) => ({ ...RECORD, id }),
-		meta: () => [],
-		sections: [],
-		refresh: async () => [],
-		persist: async () => []
-	}) as unknown as EntityConfig<Identified>;
+const config = () => makeEntityConfig<Identified>({ newItem: (id) => ({ ...RECORD, id }) });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const renderKind = (section: SectionConfig<any>) => {

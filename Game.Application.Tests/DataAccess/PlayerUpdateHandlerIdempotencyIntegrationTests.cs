@@ -732,8 +732,9 @@ namespace Game.Application.Tests.DataAccess
         public async Task LessonRead_AppliedConcurrently_InsertsOneRowWithoutThrowing()
         {
             // No PlayerLesson row exists yet, so every concurrent apply's absolute-update misses and falls
-            // through to insert; only one insert wins and the rest hit the unique-violation catch, clear their
-            // tracker, and re-run the absolute update against the now-existing row.
+            // through to insert; only one insert wins and the rest are restarted by the guard, which clears the
+            // tracker and re-runs the attempt so the absolute update finds the now-existing row. These applies
+            // are unsequenced, so they bypass the watermark comparison and race exactly as they did before it.
             var playerId = await SeedPlayerAsync();
             var lessonId = await SeedLessonAsync();
             var unlockedAt = new DateTime(2026, 7, 16, 8, 0, 0, DateTimeKind.Utc);

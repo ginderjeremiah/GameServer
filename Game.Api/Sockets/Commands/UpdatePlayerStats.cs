@@ -33,7 +33,7 @@ namespace Game.Api.Sockets.Commands
         public override async Task<ApiSocketResponse<UpdatePlayerStatsResponse>> HandleExecuteAsync(SocketContext context, CancellationToken cancellationToken)
         {
             var player = context.Session.Player;
-            var success = await _playerService.TryUpdateAttributes(player, Parameters.Cast<IAttributeUpdate>(), cancellationToken);
+            var success = await _playerService.UpdateAttributes(player, Parameters.Cast<IAttributeUpdate>(), cancellationToken);
 
             // Both outcomes carry the authoritative post-command state (unchanged on the error path), so
             // the client can always reconcile onto it.

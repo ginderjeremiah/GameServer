@@ -1,3 +1,4 @@
+using System.Globalization;
 using Game.Core;
 using Game.Core.Players.Events;
 using Game.DataAccess;
@@ -15,10 +16,11 @@ namespace Game.Application.Tests.DataAccess
 {
     /// <summary>
     /// Verifies the <see cref="PlayerWriteWatermark"/> guard on the absolute-value write-behind handlers
-    /// (#2474): a write older than what its target already holds is skipped instead of durably regressing the
-    /// row, equal sequences still apply, and an unsequenced envelope bypasses the comparison entirely. Each
-    /// apply runs through its own DI scope (its own <see cref="GameContext"/>), mirroring the synchronizer's
-    /// per-event scope, with the envelope's sequence published onto the scope the way the dispatcher does.
+    /// (#2474, #2495, #2496): a write older than what its target already holds is skipped instead of durably
+    /// regressing the row, equal sequences still apply, and an unsequenced envelope bypasses the comparison
+    /// entirely. Each apply runs through its own DI scope (its own <see cref="GameContext"/>), mirroring the
+    /// synchronizer's per-event scope, with the envelope's sequence published onto the scope the way the
+    /// dispatcher does.
     /// </summary>
     [Collection("Integration")]
     public class PlayerWriteWatermarkIntegrationTests : ApplicationIntegrationTestBase
@@ -28,6 +30,13 @@ namespace Game.Application.Tests.DataAccess
 
         private const int Helm = (int)EEquipmentSlot.HelmSlot;
         private const int Chest = (int)EEquipmentSlot.ChestSlot;
+
+        // Enough concurrent applies that several pass their existence check before any insert commits, so the
+        // guard's restart is exercised rather than only the uncontended path. Mirrors the idempotency suite.
+        private const int Parallelism = 8;
+
+        // Fixed so a lesson's ReadAt is asserted as an offset from a known instant rather than from "now".
+        private static readonly DateTime LessonUnlockedAt = new(2026, 7, 16, 8, 0, 0, DateTimeKind.Utc);
 
         // The prerequisites a ModAppliedEvent assumes already exist, plus a second mod so a re-apply can be
         // told apart from a no-op rather than only from a row count.
@@ -574,6 +583,403 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal(3, await ReadWatermarkAsync(mods.PlayerId, PlayerWriteStream.Mods, PlayerWriteTargets.Mods.Slot(mods.ItemId, mods.SlotId)));
         }
 
+        [Fact]
+        public async Task AttributeAllocationsChanged_OlderSequenceAfterNewer_IsSkippedAndLeavesTheWatermark()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            await ApplyAsync(AllocationEvent(playerId, strength: 20d), sequence: 2);
+            var rejected = await ApplyAsync(AllocationEvent(playerId, strength: 5d), sequence: 1);
+
+            // The consequential one: a stale apply reverts spent stat points while the player row's
+            // StatPointsUsed may already hold the newer value, leaving the two disagreeing.
+            Assert.Equal(1, rejected);
+            Assert.Equal(20m, await ReadAllocationAsync(playerId, EAttribute.Strength));
+            Assert.Equal(2, await ReadWatermarkAsync(playerId, PlayerWriteStream.AttributeAllocations, PlayerWriteWatermarkGuard.PlayerScopedTarget));
+        }
+
+        [Fact]
+        public async Task AttributeAllocationsChanged_EqualSequence_Applies()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            await ApplyAsync(AllocationEvent(playerId, strength: 20d), sequence: 3);
+            var rejected = await ApplyAsync(AllocationEvent(playerId, strength: 21d), sequence: 3);
+
+            Assert.Equal(0, rejected);
+            Assert.Equal(21m, await ReadAllocationAsync(playerId, EAttribute.Strength));
+        }
+
+        [Fact]
+        public async Task AttributeAllocationsChanged_NewerSequence_AppliesAndAdvancesTheWatermark()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            await ApplyAsync(AllocationEvent(playerId, strength: 5d), sequence: 1);
+            var rejected = await ApplyAsync(AllocationEvent(playerId, strength: 20d), sequence: 2);
+
+            Assert.Equal(0, rejected);
+            Assert.Equal(20m, await ReadAllocationAsync(playerId, EAttribute.Strength));
+            Assert.Equal(2, await ReadWatermarkAsync(playerId, PlayerWriteStream.AttributeAllocations, PlayerWriteWatermarkGuard.PlayerScopedTarget));
+        }
+
+        [Fact]
+        public async Task AttributeAllocationsChanged_UnsequencedEvent_AppliesAgainstAnAdvancedWatermarkAndLeavesItUnchanged()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            await ApplyAsync(AllocationEvent(playerId, strength: 20d), sequence: 5);
+            var rejected = await ApplyAsync(AllocationEvent(playerId, strength: 3d), sequence: DomainEventEnvelope.Unsequenced);
+
+            Assert.Equal(0, rejected);
+            Assert.Equal(3m, await ReadAllocationAsync(playerId, EAttribute.Strength));
+            Assert.Equal(5, await ReadWatermarkAsync(playerId, PlayerWriteStream.AttributeAllocations, PlayerWriteWatermarkGuard.PlayerScopedTarget));
+        }
+
+        [Fact]
+        public async Task SelectedSkillsChanged_OlderSequenceAfterNewer_IsSkippedAndLeavesTheWatermark()
+        {
+            var playerId = await SeedPlayerAsync();
+            var firstSkillId = await SeedSkillAsync();
+            var secondSkillId = await SeedSkillAsync();
+
+            await ApplyAsync(new SelectedSkillsChangedEvent(playerId, [secondSkillId]), sequence: 2);
+            var rejected = await ApplyAsync(new SelectedSkillsChangedEvent(playerId, [firstSkillId]), sequence: 1);
+
+            // The whole loadout is one target: applying the older rebuild would restore a loadout the player
+            // has already replaced, deselecting the skill the newer event equipped.
+            Assert.Equal(1, rejected);
+            Assert.Equal([secondSkillId], await ReadSelectedSkillIdsAsync(playerId));
+            Assert.Equal(2, await ReadWatermarkAsync(playerId, PlayerWriteStream.SelectedSkills, PlayerWriteWatermarkGuard.PlayerScopedTarget));
+        }
+
+        [Fact]
+        public async Task SelectedSkillsChanged_EqualSequence_Applies()
+        {
+            var playerId = await SeedPlayerAsync();
+            var firstSkillId = await SeedSkillAsync();
+            var secondSkillId = await SeedSkillAsync();
+
+            await ApplyAsync(new SelectedSkillsChangedEvent(playerId, [firstSkillId]), sequence: 3);
+            var rejected = await ApplyAsync(new SelectedSkillsChangedEvent(playerId, [firstSkillId, secondSkillId]), sequence: 3);
+
+            Assert.Equal(0, rejected);
+            Assert.Equal([firstSkillId, secondSkillId], await ReadSelectedSkillIdsAsync(playerId));
+        }
+
+        [Fact]
+        public async Task SelectedSkillsChanged_NewerSequence_AppliesAndAdvancesTheWatermark()
+        {
+            var playerId = await SeedPlayerAsync();
+            var firstSkillId = await SeedSkillAsync();
+            var secondSkillId = await SeedSkillAsync();
+
+            await ApplyAsync(new SelectedSkillsChangedEvent(playerId, [firstSkillId]), sequence: 1);
+            var rejected = await ApplyAsync(new SelectedSkillsChangedEvent(playerId, [secondSkillId]), sequence: 2);
+
+            Assert.Equal(0, rejected);
+            Assert.Equal([secondSkillId], await ReadSelectedSkillIdsAsync(playerId));
+            Assert.Equal(2, await ReadWatermarkAsync(playerId, PlayerWriteStream.SelectedSkills, PlayerWriteWatermarkGuard.PlayerScopedTarget));
+        }
+
+        [Fact]
+        public async Task SelectedSkillsChanged_UnsequencedEvent_AppliesAgainstAnAdvancedWatermarkAndLeavesItUnchanged()
+        {
+            var playerId = await SeedPlayerAsync();
+            var firstSkillId = await SeedSkillAsync();
+            var secondSkillId = await SeedSkillAsync();
+
+            await ApplyAsync(new SelectedSkillsChangedEvent(playerId, [secondSkillId]), sequence: 5);
+            var rejected = await ApplyAsync(new SelectedSkillsChangedEvent(playerId, [firstSkillId]), sequence: DomainEventEnvelope.Unsequenced);
+
+            Assert.Equal(0, rejected);
+            Assert.Equal([firstSkillId], await ReadSelectedSkillIdsAsync(playerId));
+            Assert.Equal(5, await ReadWatermarkAsync(playerId, PlayerWriteStream.SelectedSkills, PlayerWriteWatermarkGuard.PlayerScopedTarget));
+        }
+
+        [Fact]
+        public async Task LogPreferenceChanged_OlderSequenceAfterNewer_IsSkippedAndLeavesTheWatermark()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            await ApplyAsync(new LogPreferenceChangedEvent(playerId, ELogType.Damage, Enabled: false), sequence: 2);
+            var rejected = await ApplyAsync(new LogPreferenceChangedEvent(playerId, ELogType.Damage, Enabled: true), sequence: 1);
+
+            Assert.Equal(1, rejected);
+            Assert.False(await ReadLogPreferenceAsync(playerId, ELogType.Damage));
+            Assert.Equal(2, await ReadWatermarkAsync(playerId, PlayerWriteStream.LogPreference, LogTarget(ELogType.Damage)));
+        }
+
+        [Fact]
+        public async Task LogPreferenceChanged_EqualSequence_Applies()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            await ApplyAsync(new LogPreferenceChangedEvent(playerId, ELogType.Damage, Enabled: false), sequence: 3);
+            var rejected = await ApplyAsync(new LogPreferenceChangedEvent(playerId, ELogType.Damage, Enabled: true), sequence: 3);
+
+            Assert.Equal(0, rejected);
+            Assert.True(await ReadLogPreferenceAsync(playerId, ELogType.Damage));
+        }
+
+        [Fact]
+        public async Task LogPreferenceChanged_NewerSequence_AppliesAndAdvancesTheWatermark()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            await ApplyAsync(new LogPreferenceChangedEvent(playerId, ELogType.Damage, Enabled: true), sequence: 1);
+            var rejected = await ApplyAsync(new LogPreferenceChangedEvent(playerId, ELogType.Damage, Enabled: false), sequence: 2);
+
+            Assert.Equal(0, rejected);
+            Assert.False(await ReadLogPreferenceAsync(playerId, ELogType.Damage));
+            Assert.Equal(2, await ReadWatermarkAsync(playerId, PlayerWriteStream.LogPreference, LogTarget(ELogType.Damage)));
+        }
+
+        [Fact]
+        public async Task LogPreferenceChanged_UnsequencedEvent_AppliesAgainstAnAdvancedWatermarkAndLeavesItUnchanged()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            await ApplyAsync(new LogPreferenceChangedEvent(playerId, ELogType.Damage, Enabled: false), sequence: 5);
+            var rejected = await ApplyAsync(new LogPreferenceChangedEvent(playerId, ELogType.Damage, Enabled: true), sequence: DomainEventEnvelope.Unsequenced);
+
+            Assert.Equal(0, rejected);
+            Assert.True(await ReadLogPreferenceAsync(playerId, ELogType.Damage));
+            Assert.Equal(5, await ReadWatermarkAsync(playerId, PlayerWriteStream.LogPreference, LogTarget(ELogType.Damage)));
+        }
+
+        [Fact]
+        public async Task LogPreferenceChanged_OlderEventForADifferentLogType_IsNotRejectedByTheNewerOne()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            await ApplyAsync(new LogPreferenceChangedEvent(playerId, ELogType.Damage, Enabled: false), sequence: 2);
+            var rejected = await ApplyAsync(new LogPreferenceChangedEvent(playerId, ELogType.Exp, Enabled: false), sequence: 1);
+
+            // Each event carries one log type's flag, so the key has to be per type: a per-player watermark
+            // would discard this still-current change to Exp purely because Damage was written more recently.
+            Assert.Equal(0, rejected);
+            Assert.False(await ReadLogPreferenceAsync(playerId, ELogType.Exp));
+            Assert.False(await ReadLogPreferenceAsync(playerId, ELogType.Damage));
+        }
+
+        [Fact]
+        public async Task ItemFavoriteChanged_OlderSequenceAfterNewer_IsSkippedAndLeavesTheWatermark()
+        {
+            var playerId = await SeedPlayerAsync();
+            var itemId = await SeedItemAsync();
+
+            await ApplyAsync(new ItemFavoriteChangedEvent(playerId, itemId, Favorite: true), sequence: 2);
+            var rejected = await ApplyAsync(new ItemFavoriteChangedEvent(playerId, itemId, Favorite: false), sequence: 1);
+
+            Assert.Equal(1, rejected);
+            Assert.True(await ReadFavoriteAsync(playerId, itemId));
+            Assert.Equal(2, await ReadWatermarkAsync(playerId, PlayerWriteStream.ItemFavorite, ItemTarget(itemId)));
+        }
+
+        [Fact]
+        public async Task ItemFavoriteChanged_EqualSequence_Applies()
+        {
+            var playerId = await SeedPlayerAsync();
+            var itemId = await SeedItemAsync();
+
+            await ApplyAsync(new ItemFavoriteChangedEvent(playerId, itemId, Favorite: true), sequence: 3);
+            var rejected = await ApplyAsync(new ItemFavoriteChangedEvent(playerId, itemId, Favorite: false), sequence: 3);
+
+            Assert.Equal(0, rejected);
+            Assert.False(await ReadFavoriteAsync(playerId, itemId));
+        }
+
+        [Fact]
+        public async Task ItemFavoriteChanged_NewerSequence_AppliesAndAdvancesTheWatermark()
+        {
+            var playerId = await SeedPlayerAsync();
+            var itemId = await SeedItemAsync();
+
+            await ApplyAsync(new ItemFavoriteChangedEvent(playerId, itemId, Favorite: false), sequence: 1);
+            var rejected = await ApplyAsync(new ItemFavoriteChangedEvent(playerId, itemId, Favorite: true), sequence: 2);
+
+            Assert.Equal(0, rejected);
+            Assert.True(await ReadFavoriteAsync(playerId, itemId));
+            Assert.Equal(2, await ReadWatermarkAsync(playerId, PlayerWriteStream.ItemFavorite, ItemTarget(itemId)));
+        }
+
+        [Fact]
+        public async Task ItemFavoriteChanged_UnsequencedEvent_AppliesAgainstAnAdvancedWatermarkAndLeavesItUnchanged()
+        {
+            var playerId = await SeedPlayerAsync();
+            var itemId = await SeedItemAsync();
+
+            await ApplyAsync(new ItemFavoriteChangedEvent(playerId, itemId, Favorite: true), sequence: 5);
+            var rejected = await ApplyAsync(new ItemFavoriteChangedEvent(playerId, itemId, Favorite: false), sequence: DomainEventEnvelope.Unsequenced);
+
+            Assert.Equal(0, rejected);
+            Assert.False(await ReadFavoriteAsync(playerId, itemId));
+            Assert.Equal(5, await ReadWatermarkAsync(playerId, PlayerWriteStream.ItemFavorite, ItemTarget(itemId)));
+        }
+
+        [Fact]
+        public async Task ItemFavoriteChanged_OlderEventForADifferentItem_IsNotRejectedByTheNewerOne()
+        {
+            var playerId = await SeedPlayerAsync();
+            var favoritedItemId = await SeedItemAsync();
+            var otherItemId = await SeedItemAsync();
+
+            await ApplyAsync(new ItemFavoriteChangedEvent(playerId, favoritedItemId, Favorite: true), sequence: 2);
+            var rejected = await ApplyAsync(new ItemFavoriteChangedEvent(playerId, otherItemId, Favorite: true), sequence: 1);
+
+            Assert.Equal(0, rejected);
+            Assert.True(await ReadFavoriteAsync(playerId, otherItemId));
+            Assert.True(await ReadFavoriteAsync(playerId, favoritedItemId));
+        }
+
+        [Fact]
+        public async Task LessonRead_OlderSequenceAfterNewer_IsSkippedAndLeavesTheWatermark()
+        {
+            var playerId = await SeedPlayerAsync();
+            var lessonId = await SeedLessonAsync();
+
+            await ApplyAsync(ReadLesson(playerId, lessonId, readAtMinute: 20), sequence: 2);
+            var rejected = await ApplyAsync(ReadLesson(playerId, lessonId, readAtMinute: 5), sequence: 1);
+
+            Assert.Equal(1, rejected);
+            Assert.Equal(LessonUnlockedAt.AddMinutes(20), await ReadLessonReadAtAsync(playerId, lessonId));
+            Assert.Equal(2, await ReadWatermarkAsync(playerId, PlayerWriteStream.LessonRead, LessonTarget(lessonId)));
+        }
+
+        [Fact]
+        public async Task LessonRead_EqualSequence_Applies()
+        {
+            var playerId = await SeedPlayerAsync();
+            var lessonId = await SeedLessonAsync();
+
+            await ApplyAsync(ReadLesson(playerId, lessonId, readAtMinute: 5), sequence: 3);
+            var rejected = await ApplyAsync(ReadLesson(playerId, lessonId, readAtMinute: 20), sequence: 3);
+
+            Assert.Equal(0, rejected);
+            Assert.Equal(LessonUnlockedAt.AddMinutes(20), await ReadLessonReadAtAsync(playerId, lessonId));
+        }
+
+        [Fact]
+        public async Task LessonRead_NewerSequence_AppliesAndAdvancesTheWatermark()
+        {
+            var playerId = await SeedPlayerAsync();
+            var lessonId = await SeedLessonAsync();
+
+            await ApplyAsync(ReadLesson(playerId, lessonId, readAtMinute: 5), sequence: 1);
+            var rejected = await ApplyAsync(ReadLesson(playerId, lessonId, readAtMinute: 20), sequence: 2);
+
+            Assert.Equal(0, rejected);
+            Assert.Equal(LessonUnlockedAt.AddMinutes(20), await ReadLessonReadAtAsync(playerId, lessonId));
+            Assert.Equal(2, await ReadWatermarkAsync(playerId, PlayerWriteStream.LessonRead, LessonTarget(lessonId)));
+        }
+
+        [Fact]
+        public async Task LessonRead_UnsequencedEvent_AppliesAgainstAnAdvancedWatermarkAndLeavesItUnchanged()
+        {
+            var playerId = await SeedPlayerAsync();
+            var lessonId = await SeedLessonAsync();
+
+            await ApplyAsync(ReadLesson(playerId, lessonId, readAtMinute: 20), sequence: 5);
+            var rejected = await ApplyAsync(ReadLesson(playerId, lessonId, readAtMinute: 5), sequence: DomainEventEnvelope.Unsequenced);
+
+            Assert.Equal(0, rejected);
+            Assert.Equal(LessonUnlockedAt.AddMinutes(5), await ReadLessonReadAtAsync(playerId, lessonId));
+            Assert.Equal(5, await ReadWatermarkAsync(playerId, PlayerWriteStream.LessonRead, LessonTarget(lessonId)));
+        }
+
+        [Fact]
+        public async Task LessonRead_OlderEventForADifferentLesson_IsNotRejectedByTheNewerOne()
+        {
+            var playerId = await SeedPlayerAsync();
+            var readLessonId = await SeedLessonAsync("read-lesson");
+            var otherLessonId = await SeedLessonAsync("other-lesson");
+
+            await ApplyAsync(ReadLesson(playerId, readLessonId, readAtMinute: 20), sequence: 2);
+            var rejected = await ApplyAsync(ReadLesson(playerId, otherLessonId, readAtMinute: 5), sequence: 1);
+
+            Assert.Equal(0, rejected);
+            Assert.Equal(LessonUnlockedAt.AddMinutes(5), await ReadLessonReadAtAsync(playerId, otherLessonId));
+            Assert.Equal(LessonUnlockedAt.AddMinutes(20), await ReadLessonReadAtAsync(playerId, readLessonId));
+        }
+
+        [Fact]
+        public async Task PlayerProducedStreams_AreIndependent_SoOneStreamsWriteDoesNotBlockAnOlderWriteOnAnother()
+        {
+            var playerId = await SeedPlayerAsync();
+
+            // Every stream the Player aggregate produces shares one counter, so a later save's sequence is
+            // genuinely higher — but the streams write disjoint targets, and an older event on one of them is
+            // only stale relative to its own target. Sharing a watermark across them would drop it.
+            await ApplyAsync(AllocationEvent(playerId, strength: 20d), sequence: 9);
+            var rejected = await ApplyAsync(new LogPreferenceChangedEvent(playerId, ELogType.Damage, Enabled: false), sequence: 1);
+
+            Assert.Equal(0, rejected);
+            Assert.False(await ReadLogPreferenceAsync(playerId, ELogType.Damage));
+        }
+
+        [Fact]
+        public async Task GuardedItemFavorite_RacingItsUnguardedUnlockSibling_ConvergesWithoutThrowing()
+        {
+            var playerId = await SeedPlayerAsync();
+            var itemId = await SeedItemAsync();
+
+            // The five handlers guarded here lost their own unique-violation catches, so the guard's restart is
+            // now the only thing absorbing a concurrent insert. Two sequenced applies of the same target can't
+            // collide (they queue on the watermark row), so the race that still reaches the data row is against
+            // the *unguarded* insert-if-missing sibling, which bypasses the watermark entirely.
+            await RaceAsync(
+                () => ApplyAsync(new ItemFavoriteChangedEvent(playerId, itemId, Favorite: true), sequence: 4),
+                () => ApplyAsync(new ItemUnlockedEvent(playerId, itemId), sequence: DomainEventEnvelope.Unsequenced));
+
+            Assert.True(await ReadFavoriteAsync(playerId, itemId));
+            Assert.Equal(1, await CountUnlockedItemsAsync(playerId, itemId));
+            Assert.Equal(4, await ReadWatermarkAsync(playerId, PlayerWriteStream.ItemFavorite, ItemTarget(itemId)));
+        }
+
+        [Fact]
+        public async Task GuardedLessonRead_RacingItsUnguardedUnlockSibling_ConvergesWithoutThrowing()
+        {
+            var playerId = await SeedPlayerAsync();
+            var lessonId = await SeedLessonAsync();
+
+            // The other apply shape: an update-first fast path whose miss falls through to an insert, so the
+            // sibling's row can land in the window between them. The restart re-runs the update, which finds it.
+            await RaceAsync(
+                () => ApplyAsync(ReadLesson(playerId, lessonId, readAtMinute: 5), sequence: 4),
+                () => ApplyAsync(new LessonUnlockedEvent(playerId, lessonId, LessonUnlockedAt), sequence: DomainEventEnvelope.Unsequenced));
+
+            Assert.Equal(LessonUnlockedAt.AddMinutes(5), await ReadLessonReadAtAsync(playerId, lessonId));
+            Assert.Equal(4, await ReadWatermarkAsync(playerId, PlayerWriteStream.LessonRead, LessonTarget(lessonId)));
+        }
+
+        [Fact]
+        public async Task GuardedSelectedSkills_RacingItsUnguardedUnlockSibling_ConvergesWithoutThrowing()
+        {
+            var playerId = await SeedPlayerAsync();
+            var skillId = await SeedSkillAsync();
+
+            // The multi-row shape: the rebuild inserts a row for a loadout skill whose SkillUnlockedEvent
+            // hasn't been applied yet, which is exactly the row the sibling is racing it to insert.
+            await RaceAsync(
+                () => ApplyAsync(new SelectedSkillsChangedEvent(playerId, [skillId]), sequence: 4),
+                () => ApplyAsync(new SkillUnlockedEvent(playerId, skillId), sequence: DomainEventEnvelope.Unsequenced));
+
+            Assert.Equal([skillId], await ReadSelectedSkillIdsAsync(playerId));
+            Assert.Equal(4, await ReadWatermarkAsync(playerId, PlayerWriteStream.SelectedSkills, PlayerWriteWatermarkGuard.PlayerScopedTarget));
+        }
+
+        /// <summary>
+        /// Runs both applies <see cref="Parallelism"/> times each, all at once, so several pass their
+        /// existence check before any insert commits. Whether the violation actually happens is a timing
+        /// race — the assertions are on convergence, which must hold either way — so this is a probabilistic
+        /// guard on top of <c>GuardedApply_UniqueViolationInsideTheTransaction_…</c>, which forces the same
+        /// restart deterministically.
+        /// </summary>
+        private static Task RaceAsync(Func<Task<int>> guarded, Func<Task<int>> unguardedSibling)
+            => Task.WhenAll(Enumerable.Range(0, Parallelism)
+                .SelectMany(_ => new[] { guarded(), unguardedSibling() }));
+
         // Applies the given events at one sequence through independent scopes at once, the cross-instance
         // contention the watermark row is meant to serialize rather than merely detect.
         private async Task ApplyConcurrentlyAsync<TEvent>(long sequence, params TEvent[] events)
@@ -596,6 +1002,14 @@ namespace Game.Application.Tests.DataAccess
             }
         }
 
+        private async Task<int> CountUnlockedItemsAsync(int playerId, int itemId)
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            return await context.UnlockedItems.AsNoTracking()
+                .CountAsync(ui => ui.PlayerId == playerId && ui.ItemId == itemId, CancellationToken);
+        }
+
         // A separate scope means a separate GameContext on its own connection, so this commits independently
         // of the guard's in-flight transaction rather than joining it.
         private async Task InsertGlobalKillsFromAnotherScopeAsync(int playerId, decimal value)
@@ -614,6 +1028,24 @@ namespace Game.Application.Tests.DataAccess
 
         private static PlayerCoreUpdatedEvent CoreEvent(int playerId, int level, int exp)
             => new(playerId, level, exp, 0, 100, 100, DateTime.UtcNow, false, null);
+
+        // The event always carries the player's complete spread, which is what makes its player-scoped
+        // watermark key defensible — so the fixture states every allocation rather than just the varying one.
+        private static AttributeAllocationsChangedEvent AllocationEvent(int playerId, double strength) => new(
+            playerId,
+            [
+                new AttributeAllocationEntry(EAttribute.Strength, strength),
+                new AttributeAllocationEntry(EAttribute.Intellect, 0d),
+            ]);
+
+        private static LessonReadEvent ReadLesson(int playerId, int lessonId, int readAtMinute)
+            => new(playerId, lessonId, LessonUnlockedAt, LessonUnlockedAt.AddMinutes(readAtMinute));
+
+        // The target keys the guarded handlers derive, restated here so a test asserts against the format the
+        // stream documents rather than against whatever the handler happens to produce.
+        private static string LogTarget(ELogType logType) => ((int)logType).ToString(CultureInfo.InvariantCulture);
+        private static string ItemTarget(int itemId) => itemId.ToString(CultureInfo.InvariantCulture);
+        private static string LessonTarget(int lessonId) => lessonId.ToString(CultureInfo.InvariantCulture);
 
         private static CachedPlayerStatistic GlobalKills(decimal value) => new()
         {
@@ -723,6 +1155,53 @@ namespace Game.Application.Tests.DataAccess
             return row?.ItemModId;
         }
 
+        private async Task<decimal?> ReadAllocationAsync(int playerId, EAttribute attribute)
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = await context.PlayerAttributes.AsNoTracking()
+                .SingleOrDefaultAsync(pa => pa.PlayerId == playerId && pa.AttributeId == (int)attribute, CancellationToken);
+            return row?.Amount;
+        }
+
+        private async Task<List<int>> ReadSelectedSkillIdsAsync(int playerId)
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            return await context.PlayerSkills.AsNoTracking()
+                .Where(ps => ps.PlayerId == playerId && ps.Selected)
+                .OrderBy(ps => ps.Order)
+                .Select(ps => ps.SkillId)
+                .ToListAsync(CancellationToken);
+        }
+
+        private async Task<bool?> ReadLogPreferenceAsync(int playerId, ELogType logType)
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = await context.LogPreferences.AsNoTracking()
+                .SingleOrDefaultAsync(lp => lp.PlayerId == playerId && lp.LogTypeId == (int)logType, CancellationToken);
+            return row?.Enabled;
+        }
+
+        private async Task<bool?> ReadFavoriteAsync(int playerId, int itemId)
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = await context.UnlockedItems.AsNoTracking()
+                .SingleOrDefaultAsync(ui => ui.PlayerId == playerId && ui.ItemId == itemId, CancellationToken);
+            return row?.Favorite;
+        }
+
+        private async Task<DateTime?> ReadLessonReadAtAsync(int playerId, int lessonId)
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            var row = await context.PlayerLessons.AsNoTracking()
+                .SingleOrDefaultAsync(pl => pl.PlayerId == playerId && pl.LessonId == lessonId, CancellationToken);
+            return row?.ReadAt;
+        }
+
         private async Task<(int PlayerId, int ItemId)> SeedUnlockedItemAsync()
         {
             var playerId = await SeedPlayerAsync();
@@ -751,6 +1230,28 @@ namespace Game.Application.Tests.DataAccess
             await TestDataSeeder.LinkModToPlayerAsync(context, playerId, firstModId);
             await TestDataSeeder.LinkModToPlayerAsync(context, playerId, secondModId);
             return new ModFixture(playerId, itemId, slotId, firstModId, secondModId);
+        }
+
+        private async Task<int> SeedSkillAsync()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            return (await TestDataSeeder.CreateSkillAsync(context)).Id;
+        }
+
+        private async Task<int> SeedItemAsync()
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            return (await TestDataSeeder.CreateItemAsync(context)).Id;
+        }
+
+        // Lesson keys are globally unique, so a test seeding two lessons has to name them apart.
+        private async Task<int> SeedLessonAsync(string key = "test-lesson")
+        {
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+            return (await TestDataSeeder.CreateLessonAsync(context, key)).Id;
         }
 
         private async Task<int> SeedEnemyAsync()

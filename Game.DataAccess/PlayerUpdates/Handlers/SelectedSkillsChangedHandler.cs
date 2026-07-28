@@ -5,27 +5,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Game.DataAccess.PlayerUpdates.Handlers
 {
-    internal sealed class SelectedSkillsChangedHandler(GameContext context) : IPlayerUpdateHandler<SelectedSkillsChangedEvent>
+    internal sealed class SelectedSkillsChangedHandler(PlayerWriteWatermarkGuard guard) : IPlayerUpdateHandler<SelectedSkillsChangedEvent>
     {
-        public async Task HandleAsync(SelectedSkillsChangedEvent evt)
-        {
-            // The load-then-upsert isn't atomic, so a concurrent apply of the same at-least-once event — or a
-            // SkillUnlockedEvent reordered behind this one — can insert a (player, skill) row between our load
-            // and save. On the resulting unique violation, clear and re-run once: the now-existing row loads as
-            // an update, so the second pass carries no conflicting insert. A second failure propagates to the
-            // queue's retry policy rather than looping. (Mirrors AttributeAllocationsChangedHandler.)
-            try
-            {
-                await ApplyAsync(evt);
-            }
-            catch (DbUpdateException ex) when (ex.IsUniqueViolation())
-            {
-                context.ChangeTracker.Clear();
-                await ApplyAsync(evt);
-            }
-        }
+        // The apply rebuilds every one of the player's Selected/Order columns, so a stale replay durably
+        // restores a loadout the player has already replaced. Keyed on the loadout as a unit — see
+        // PlayerWriteStream.SelectedSkills. The guard owns the transaction, the context, and the restart.
+        public Task HandleAsync(SelectedSkillsChangedEvent evt)
+            => guard.ExecuteGuardedAsync(
+                evt.PlayerId,
+                PlayerWriteStream.SelectedSkills,
+                [PlayerWriteWatermarkGuard.PlayerScopedTarget],
+                (context, _) => ApplyAsync(context, evt));
 
-        private async Task ApplyAsync(SelectedSkillsChangedEvent evt)
+        private static async Task ApplyAsync(GameContext context, SelectedSkillsChangedEvent evt)
         {
             // Rebuild Selected/Order from the event's full ordered loadout, applied as a single write: fetch the
             // player's skill rows, reset every flag, then mark each id in the loadout Selected = true with its
