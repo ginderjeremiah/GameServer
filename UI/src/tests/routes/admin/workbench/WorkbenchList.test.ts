@@ -22,20 +22,18 @@ vi.mock('$stores', () => ({
 import WorkbenchList from '$routes/admin/workbench/components/WorkbenchList.svelte';
 import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
 import type { EntityConfig, Identified } from '$routes/admin/workbench/entities/types';
+import { makeEntityConfig } from '../../../fixtures/workbench-config';
 
-const makeConfig = (retireable = false): EntityConfig<Identified> => ({
-	key: 'rows',
-	label: 'Enemies',
-	singular: 'Enemy',
-	glyph: 'box',
-	blankName: 'Unnamed',
-	retireable,
-	newItem: (id) => ({ id, name: '' }),
-	meta: () => [],
-	sections: [],
-	refresh: async () => [],
-	persist: async () => ({ records: [], idMap: new Map() })
-});
+const makeConfig = (retireable = false) =>
+	makeEntityConfig<Identified>({
+		// Both are read back by assertions below: the label as the list header, blankName as the
+		// placeholder a nameless row falls back to.
+		label: 'Enemies',
+		blankName: 'Unnamed',
+		singular: 'Enemy',
+		retireable,
+		newItem: (id) => ({ id, name: '' })
+	});
 
 const seed: Identified[] = [
 	{ id: 1, name: 'Goblin' },

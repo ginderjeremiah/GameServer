@@ -18,8 +18,9 @@ vi.mock('$stores', () => ({ toastError: vi.fn() }));
 
 import ChallengeConditionSection from '$routes/admin/workbench/components/challenge/ChallengeConditionSection.svelte';
 import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
-import type { EntityConfig, Identified } from '$routes/admin/workbench/entities/types';
+import type { Identified } from '$routes/admin/workbench/entities/types';
 import { makeChallenge } from '../../../../fixtures/challenges';
+import { makeEntityConfig } from '../../../../fixtures/workbench-config';
 
 const CHALLENGE_TYPES = [
 	{
@@ -31,19 +32,13 @@ const CHALLENGE_TYPES = [
 	{ id: EChallengeType.LevelReached, name: 'Level Reached', goalComparison: 1, statisticType: null }
 ];
 
-const config = (): EntityConfig<Identified> =>
-	({
+const config = () =>
+	makeEntityConfig<Identified>({
 		key: 'challenges',
 		label: 'Challenges',
 		singular: 'Challenge',
-		glyph: 'box',
-		blankName: 'Unnamed',
-		newItem: (id: number) => ({ id }),
-		meta: () => [],
-		sections: [],
-		refresh: async () => [],
-		persist: async () => []
-	}) as unknown as EntityConfig<Identified>;
+		newItem: (id) => ({ id })
+	});
 
 const setup = (over: Partial<IChallenge> = {}) => {
 	/* The condition dimension is stated in full rather than inherited: the suite asserts these four fields

@@ -22,7 +22,7 @@ All frontend code lives in `UI`:
 
 Unit-test all UI logic (pages/components) and lib code; simple non-interactive display components don't need tests. Place tests under `tests` mirroring the source structure. Use Playwright e2e tests only for critical user flows, written from the user's perspective — they're costly to write and run.
 
-Shared contract builders for reference-data types (`IAttribute`, `IProficiency`, `ISkill`, …) live in `UI/src/tests/fixtures/`, one module per contract exporting a `make<Contract>(overrides)` with neutral defaults. Build on those rather than hand-rolling a contract literal per suite, so a new required field is one edit instead of dozens; where a suite needs different defaults, wrap the shared builder and state only the divergence.
+Shared contract builders live in `UI/src/tests/fixtures/`, one module per contract exporting a `make<Contract>(overrides)` with neutral defaults — for reference-data types (`IAttribute`, `IProficiency`, `ISkill`, …) and for internal contracts a suite has to construct wholesale (the workbench's `EntityConfig`). Build on those rather than hand-rolling a contract literal per suite, so a new required field is one edit instead of dozens; where a suite needs different defaults, wrap the shared builder and state only the divergence.
 
 A test that reads committed content directly (e.g. asserting `content/lessons.json` only references real frontend keys) imports it via the `$content` alias (`kit.alias` in `svelte.config.js`, pointing at the repo-root `content/` folder) rather than a deep relative path out of the `UI/` package root.
 

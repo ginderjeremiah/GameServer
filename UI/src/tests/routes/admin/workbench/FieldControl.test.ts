@@ -6,7 +6,8 @@ vi.mock('$stores', () => ({ toastError: vi.fn() }));
 
 import FieldControl from '$routes/admin/workbench/components/FieldControl.svelte';
 import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
-import type { EntityConfig, FieldConfig, Identified } from '$routes/admin/workbench/entities/types';
+import type { FieldConfig, Identified } from '$routes/admin/workbench/entities/types';
+import { makeEntityConfig } from '../../../fixtures/workbench-config';
 
 interface Row extends Identified {
 	name: string;
@@ -16,19 +17,8 @@ interface Row extends Identified {
 	choice: number;
 }
 
-const config = (): EntityConfig<Row> =>
-	({
-		key: 'rows',
-		label: 'Rows',
-		singular: 'Row',
-		glyph: 'box',
-		blankName: 'Unnamed',
-		newItem: (id: number) => ({ id, name: '', count: 0, enabled: false, notes: '', choice: 1 }),
-		meta: () => [],
-		sections: [],
-		refresh: async () => [],
-		persist: async () => []
-	}) as unknown as EntityConfig<Row>;
+const config = () =>
+	makeEntityConfig<Row>({ newItem: (id) => ({ id, name: '', count: 0, enabled: false, notes: '', choice: 1 }) });
 
 const seed = (): Row[] => [{ id: 1, name: 'Alpha', count: 5, enabled: false, notes: 'hi', choice: 1 }];
 
