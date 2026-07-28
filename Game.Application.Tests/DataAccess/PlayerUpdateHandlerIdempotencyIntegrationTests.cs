@@ -287,8 +287,8 @@ namespace Game.Application.Tests.DataAccess
                 secondModId = (await TestDataSeeder.CreateItemModAsync(context, name: "Second Mod")).Id;
             }
 
-            // The second apply swaps the slot's mod: the delete-then-insert replaces the row in place rather
-            // than duplicating, so the slot converges to the latest mod.
+            // The second apply swaps the slot's mod: the load-then-upsert writes the new mod id onto the row
+            // that is already there rather than duplicating, so the slot converges to the latest mod.
             await ApplyAsync(new ModAppliedEvent(playerId, itemId, slotId, firstModId));
             await ApplyAsync(new ModAppliedEvent(playerId, itemId, slotId, secondModId));
 

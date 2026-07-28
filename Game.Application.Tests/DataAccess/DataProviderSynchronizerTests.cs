@@ -768,7 +768,7 @@ namespace Game.Application.Tests.DataAccess
             var pubsub = scope.ServiceProvider.GetRequiredService<IPubSubService>();
             var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, pubsub, logger, TestRetryPolicy);
 
-            // Delivered twice: the delete-then-insert handler must converge to a single applied mod in the slot.
+            // Delivered twice: the load-then-upsert handler must converge to a single applied mod in the slot.
             var queue = new InMemoryPubSubQueue(Serialize(evt), Serialize(evt));
 
             await synchronizer.ProcessQueue(queue);
