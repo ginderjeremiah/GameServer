@@ -1,5 +1,8 @@
 import { EAttribute, EAttributeType, type IAttribute } from '$lib/api';
 
+/* Shared `IAttribute` contract builder. Excluded on purpose: the Codex suite's untyped `staticData`
+   mock (`{} as any`). See `docs/frontend.md` → Testing Guidelines for the contract-drift rule. */
+
 /**
  * Builds an {@link IAttribute} reference-data entry for tests. The display metadata defaults to
  * neutral placeholders so tests that only care about id/name resolution stay terse; pass `overrides`
