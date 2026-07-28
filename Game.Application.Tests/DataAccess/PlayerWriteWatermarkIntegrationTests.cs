@@ -673,7 +673,7 @@ namespace Game.Application.Tests.DataAccess
         /// </summary>
         private static Task RaceAsync(Func<Task<int>> guarded, Func<Task<int>> unguardedSibling)
             => Task.WhenAll(Enumerable.Range(0, Parallelism)
-                .Select(i => i % 2 == 0 ? guarded() : unguardedSibling()));
+                .SelectMany(_ => new[] { guarded(), unguardedSibling() }));
 
         private async Task<int> CountUnlockedItemsAsync(int playerId, int itemId)
         {
