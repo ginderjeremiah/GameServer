@@ -192,7 +192,11 @@ namespace Game.Application.Tests.DataAccess
         public async Task RunAsync_SignalArrivesBeforeReconciliationInterval_ResetsThePeriodicWait()
         {
             var cache = new RecordingCache();
-            var policy = new ReferenceCacheReloadPolicy(TimeSpan.Zero, maxAttempts: 1, baseDelay: TimeSpan.Zero, reconciliationInterval: TimeSpan.FromMilliseconds(200));
+            // The interval only has to outlast the observation window below: the regression this guards
+            // against (a carried-over periodic wait) fires a sweep immediately after the reactive one, so a
+            // generous interval costs no detection power but keeps runner jitter from firing the legitimate
+            // periodic sweep inside the window and failing the test spuriously.
+            var policy = new ReferenceCacheReloadPolicy(TimeSpan.Zero, maxAttempts: 1, baseDelay: TimeSpan.Zero, reconciliationInterval: TimeSpan.FromSeconds(2));
             await using var harness = new Harness(policy, cache);
 
             harness.Reloader.NotifyChanged();
