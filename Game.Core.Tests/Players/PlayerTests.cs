@@ -1111,7 +1111,7 @@ namespace Game.Core.Tests.Players
         {
             var player = MakeAllocatingPlayer();
 
-            var outcome = player.UpdateAttributes([new AttributeUpdate(EAttribute.Strength, 3)]);
+            var outcome = player.UpdateAttributes([new Update(EAttribute.Strength, 3)]);
 
             Assert.Equal(UpdateAttributesOutcome.Changed, outcome);
             Assert.Single(player.DomainEvents.OfType<PlayerCoreUpdatedEvent>());
@@ -1139,8 +1139,8 @@ namespace Game.Core.Tests.Players
             var player = MakeAllocatingPlayer();
 
             var outcome = player.UpdateAttributes([
-                new AttributeUpdate(EAttribute.Strength, 0),
-                new AttributeUpdate(EAttribute.Endurance, 0),
+                new Update(EAttribute.Strength, 0),
+                new Update(EAttribute.Endurance, 0),
             ]);
 
             Assert.Equal(UpdateAttributesOutcome.Unchanged, outcome);
@@ -1155,12 +1155,12 @@ namespace Game.Core.Tests.Players
             var player = MakeAllocatingPlayer();
             Assert.Equal(
                 UpdateAttributesOutcome.Changed,
-                player.UpdateAttributes([new AttributeUpdate(EAttribute.Strength, 2)]));
+                player.UpdateAttributes([new Update(EAttribute.Strength, 2)]));
             player.ClearEvents();
 
             var outcome = player.UpdateAttributes([
-                new AttributeUpdate(EAttribute.Strength, -2),
-                new AttributeUpdate(EAttribute.Endurance, 2),
+                new Update(EAttribute.Strength, -2),
+                new Update(EAttribute.Endurance, 2),
             ]);
 
             Assert.Equal(UpdateAttributesOutcome.Changed, outcome);
@@ -1175,7 +1175,7 @@ namespace Game.Core.Tests.Players
         {
             var player = MakeAllocatingPlayer();
 
-            var outcome = player.UpdateAttributes([new AttributeUpdate(EAttribute.MaxHealth, 1)]);
+            var outcome = player.UpdateAttributes([new Update(EAttribute.MaxHealth, 1)]);
 
             Assert.Equal(UpdateAttributesOutcome.Rejected, outcome);
             Assert.Empty(player.DomainEvents);
@@ -1529,7 +1529,7 @@ namespace Game.Core.Tests.Players
                 .WithStatPointsGained(gained)
                 .Build();
 
-        private record AttributeUpdate(EAttribute Attribute, int Amount) : IAttributeUpdate;
+        private record Update(EAttribute Attribute, int Amount) : IAttributeUpdate;
 
         /// <summary>Builds a player whose unlocked set contains a skill for each given id (none equipped).</summary>
         private static Player MakePlayerWithUnlockedSkills(params int[] skillIds)
