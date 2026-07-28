@@ -31,9 +31,9 @@ namespace Game.DataAccess.PlayerUpdates.Handlers
         {
             // Vacate the destination slot first with a single server-side statement — no prior occupant is
             // materialized into a snapshot a concurrent commit could tear, so the upsert below can't collide with
-            // it on the (player, slot) unique index. Mirrors ModAppliedHandler's clear-then-write. Both writes
-            // are inside the guard's transaction, so the slot is never observably empty between them and a crash
-            // rolls back to the pre-equip state rather than leaving it vacated.
+            // it on the (player, slot) unique index. Both writes are inside the guard's transaction, so the slot
+            // is never observably empty between them and a crash rolls back to the pre-equip state rather than
+            // leaving it vacated.
             await context.UnlockedItems
                 .Where(ui => ui.PlayerId == evt.PlayerId && ui.EquipmentSlotId == evt.SlotId && ui.ItemId != evt.ItemId)
                 .ExecuteUpdateAsync(s => s.SetProperty(ui => ui.EquipmentSlotId, (int?)null));
