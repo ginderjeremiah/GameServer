@@ -10,15 +10,8 @@ import { EDamageType, ERarity, ESkillAcquisition, type ISkill } from '$lib/api';
 
    Nine suites are excluded on purpose: the codex pair, `workbench/reference`, and the workbench
    entities/progression suites all seed skill literals into a mocked `staticData` — most as `{} as any`,
-   the progression pair via `progression-test-utils`' `unknown[]`. Nothing type-checks them as `ISkill`,
-   so they pay no contract-drift tax, and filling their previously-`undefined` fields could change what
-   a suite renders. A `grep` for skill-shaped literals under `src/tests/` still finding them is
-   expected, not a gap.
-
-   A literal asserted `as ISkill` is a different case — it claims the contract to its consumer while
-   silencing the missing field, so it looks covered and isn't. #2447 folded those in
-   (`fight/ActiveEffectChips.test.ts`, `inventory/inventory-view.test.ts`); reintroducing such a cast
-   re-opens the hole, so state why if you do. */
+   the progression pair via `progression-test-utils`' `unknown[]`. Nothing type-checks them as `ISkill`.
+   See `docs/frontend.md` → Testing Guidelines for the contract-drift rule. */
 
 /**
  * Builds an {@link ISkill} reference-data entry for tests. Everything but the id is a neutral
