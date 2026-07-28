@@ -34,7 +34,7 @@ namespace Game.Core.Players
         /// Builds the seeded allocation set every player carries: one zero-amount row per core attribute.
         /// The rows are a display/persistence convenience — they give the client a complete per-attribute
         /// spread to render and reconcile against without inferring the missing entries — not a correctness
-        /// requirement: <see cref="TryUpdateAttributes"/> decides allocatability from
+        /// requirement: <see cref="UpdateAttributes"/> decides allocatability from
         /// <see cref="CoreAttribute.IsCore"/> and creates a row on first spend, so a missing one costs a
         /// stale display at worst. The amount is zero because the class's starting spread is delivered by
         /// the level-scaled locked base at battler assembly, never seeded into the free pool.
@@ -50,7 +50,7 @@ namespace Game.Core.Players
         /// the complete-spread shape <see cref="CreateAllocations"/> establishes at creation cannot be
         /// bypassed by a load path that forgets to re-establish it, and so an existing character gains a row
         /// for a core attribute added after they were created. The repair is belt-and-braces rather than a
-        /// correctness requirement — since <see cref="TryUpdateAttributes"/> stopped treating row presence
+        /// correctness requirement — since <see cref="UpdateAttributes"/> stopped treating row presence
         /// as permission, a missing row is a lost zero, not the permanent lockout of #2459.
         /// <para>
         /// Restored rows are appended, so a repaired character's allocations are not in the same order as a
@@ -79,11 +79,11 @@ namespace Game.Core.Players
         }
 
         /// <summary>
-        /// Attempts to apply the given <paramref name="changedAttributes"/> to the player's stat allocations.
+        /// Applies the given <paramref name="changedAttributes"/> to the player's stat allocations, reporting
+        /// which of the three outcomes occurred rather than a bare "not rejected" bool, so the caller can
+        /// persist only on a real change (#2485).
         /// </summary>
-        /// <param name="changedAttributes"></param>
-        /// <returns><see langword="true"/> if successful, otherwise <see langword="false"/></returns>
-        public bool TryUpdateAttributes(IEnumerable<IAttributeUpdate> changedAttributes)
+        public UpdateAttributesOutcome UpdateAttributes(IEnumerable<IAttributeUpdate> changedAttributes)
         {
             var allocationsByAttribute = StatAllocations.ToDictionary(allocation => allocation.Attribute);
             // Match each update to the player's allocation row, creating one at zero if the attribute has
@@ -102,7 +102,7 @@ namespace Game.Core.Players
             {
                 if (!CoreAttribute.IsCore(update.Attribute))
                 {
-                    return false;
+                    return UpdateAttributesOutcome.Rejected;
                 }
 
                 if (!allocationsByAttribute.TryGetValue(update.Attribute, out var allocation))
@@ -113,7 +113,7 @@ namespace Game.Core.Players
 
                 if (!matchedUpdates.TryAdd(update.Attribute, (allocation, update)))
                 {
-                    return false;
+                    return UpdateAttributesOutcome.Rejected;
                 }
             }
 
@@ -125,6 +125,14 @@ namespace Game.Core.Players
             if (availablePoints - changedPoints >= 0
                 && matchedUpdates.Values.All(match => match.Allocation.Amount + (long)match.Update.Amount >= 0))
             {
+                // Accepted, but did it allocate anything? An empty payload and one whose every delta is zero
+                // both leave the spread exactly as they found it, and must not raise an event or enqueue a
+                // save (#2485). The test is per-update rather than on changedPoints, because a set summing to
+                // zero across attributes (+2 STR / −2 END) is a real reallocation. A created row counts too:
+                // it enters the persisted allocation set even at zero.
+                var changed = createdAllocations.Count > 0
+                    || matchedUpdates.Values.Any(match => match.Update.Amount != 0);
+
                 // Rows created above are published only now, so a rejected payload leaves the allocation set
                 // exactly as it found it.
                 StatAllocations.AddRange(createdAllocations);
@@ -134,10 +142,10 @@ namespace Game.Core.Players
                     allocation.Amount += update.Amount;
                 }
 
-                return true;
+                return changed ? UpdateAttributesOutcome.Changed : UpdateAttributesOutcome.Unchanged;
             }
 
-            return false;
+            return UpdateAttributesOutcome.Rejected;
         }
     }
 }

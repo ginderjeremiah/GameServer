@@ -18,9 +18,14 @@ namespace Game.Application.Services
             return await _playerRepo.GetPlayer(playerId, cancellationToken);
         }
 
-        public async Task<bool> TryUpdateAttributes(Player player, IEnumerable<IAttributeUpdate> updates, CancellationToken cancellationToken = default)
+        // A payload that allocates nothing (empty, or all-zero deltas) saves nothing but is still accepted —
+        // accepting is not the same as changing, so only an anti-cheat rejection is reported as a failure.
+        public async Task<bool> UpdateAttributes(Player player, IEnumerable<IAttributeUpdate> updates, CancellationToken cancellationToken = default)
         {
-            return await SaveIf(player, player.TryUpdateAttributes(updates), cancellationToken);
+            var outcome = player.UpdateAttributes(updates);
+            await SaveIf(player, outcome == UpdateAttributesOutcome.Changed, cancellationToken);
+
+            return outcome != UpdateAttributesOutcome.Rejected;
         }
 
         // Returns the loaded proficiency levels alongside the outcome so callers that need them again for the

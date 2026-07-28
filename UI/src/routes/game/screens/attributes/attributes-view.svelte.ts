@@ -18,7 +18,7 @@
    intentionally omitted and appear automatically once listed here with a real
    per-point formula.
 
-   The backend (`PlayerStatPoints.TryUpdateAttributes`) allows points to be moved
+   The backend (`PlayerStatPoints.UpdateAttributes`) allows points to be moved
    freely — any attribute can be decremented back to 0, refunding its points to
    the pool — so there is no respec cost or locked baseline here. */
 
