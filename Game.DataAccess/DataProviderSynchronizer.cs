@@ -488,9 +488,11 @@ namespace Game.DataAccess
         /// item count. Only <em>successfully</em> completed tasks are evicted: a faulted (or canceled) lane
         /// head must stay in the map so a later same-player item chains onto it and faults in turn — staying
         /// reserved for the reclaim — rather than starting a fresh lane and applying <em>ahead</em> of the
-        /// failed item's eventual reclaim/re-apply. The watermark guard would reject that replay anyway, so
-        /// this is about not doing (and acknowledging) work the guard is only going to throw away, and about
-        /// keeping a faulted player's chain reserved together so the reclaim replays it in one piece.
+        /// failed item's eventual reclaim/re-apply. This is load-bearing for correctness, not just efficiency:
+        /// the watermark guard advances on <c>&lt;=</c>, and one <c>SavePlayer</c> stamps every envelope it
+        /// raises with that save's single sequence, so two same-save siblings landing on one stream+target are
+        /// ordered by the lane <em>alone</em> — the guard is indifferent between them. Across saves the guard
+        /// is what rejects the stale replay, and the lane merely saves doing work it would throw away.
         /// Keeping them in <paramref name="inFlight"/> likewise keeps the drain-exit settle aware
         /// of them. A lane is only evicted when its <em>current</em> (most recently chained) task has
         /// completed — a still-running or not-yet-started successor for that player is left untouched, so a
@@ -569,8 +571,10 @@ namespace Game.DataAccess
         {
             // Whatever faults — this item's own apply, its acknowledge, or its predecessor on the same lane —
             // leaves the item reserved on the processing list awaiting the reclaim, and the fault surfaces to
-            // the pass's settle. A later same-player event applying before that replay is no longer this
-            // loop's problem: the watermark guard rejects the stale replay on its own merits (#2475).
+            // the pass's settle. A later same-player event from a *different save* applying before that replay
+            // is no longer this loop's problem: the watermark guard rejects the stale replay on its own merits
+            // (#2475). Siblings of the *same* save share one sequence and the guard accepts equal sequences,
+            // so the lane chain here is still the only thing ordering those against each other.
             try
             {
                 await previous;
