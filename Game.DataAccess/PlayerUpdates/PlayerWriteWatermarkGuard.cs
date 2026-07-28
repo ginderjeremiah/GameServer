@@ -128,6 +128,11 @@ namespace Game.DataAccess.PlayerUpdates
             // An indivisible multi-target write is rejected outright when any one of its keys is superseded,
             // and the rollback un-advances the keys that did pass — an advance without the write behind it
             // would make the next, genuinely older event look already applied and be skipped for good.
+            //
+            // This is the one rollback whose rejections still count (see the note on the commit path below):
+            // the event was deliberately skipped as superseded, not lost to a fault. The whole key set counts,
+            // including the keys that passed, because what was rejected is the event — so an equip reports two
+            // targets rather than the one that actually lost the comparison.
             if (allTargetsRequired && accepted.Count < keys.Length)
             {
                 await transaction.RollbackAsync();
@@ -142,8 +147,11 @@ namespace Game.DataAccess.PlayerUpdates
 
             await transaction.CommitAsync();
 
-            // Counted only once the transaction has actually committed, so an apply that rolled back doesn't
-            // report rejections that were themselves rolled back. The drain surfaces the per-pass total.
+            // Counted only once the transaction has actually committed, so an apply that *faulted* doesn't
+            // report rejections that were themselves rolled back — it never reaches here. That is about lost
+            // work, not about rollbacks generally: the deliberate all-or-nothing rejection above rolls back
+            // and still counts, because there the skip is the outcome rather than a casualty of it. The drain
+            // surfaces the per-pass total.
             updateContext.RecordRejectedTargets(keys.Length - accepted.Count);
         }
 

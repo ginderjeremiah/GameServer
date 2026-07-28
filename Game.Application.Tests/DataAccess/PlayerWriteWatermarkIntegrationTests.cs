@@ -295,7 +295,7 @@ namespace Game.Application.Tests.DataAccess
         public async Task ItemEquipped_OlderEquipIntoASlotANewerEquipOwns_IsRejectedAndAdvancesNeitherWatermark()
         {
             var (playerId, incumbentId) = await SeedUnlockedItemAsync();
-            var challengerId = await SeedItemFor(playerId);
+            var challengerId = await SeedItemForAsync(playerId);
 
             await ApplyAsync(new ItemEquippedEvent(playerId, incumbentId, Helm), sequence: 5);
             var rejected = await ApplyAsync(new ItemEquippedEvent(playerId, challengerId, Helm), sequence: 3);
@@ -335,7 +335,7 @@ namespace Game.Application.Tests.DataAccess
         public async Task ItemEquipped_EqualSequence_Applies()
         {
             var (playerId, incumbentId) = await SeedUnlockedItemAsync();
-            var challengerId = await SeedItemFor(playerId);
+            var challengerId = await SeedItemForAsync(playerId);
 
             await ApplyAsync(new ItemEquippedEvent(playerId, incumbentId, Helm), sequence: 4);
             // Both keys are at 4 and the predicate is <=, so the same save's sibling equip still lands.
@@ -350,7 +350,7 @@ namespace Game.Application.Tests.DataAccess
         public async Task ItemEquipped_UnsequencedEvent_AppliesAgainstAdvancedWatermarksAndLeavesThemUnchanged()
         {
             var (playerId, incumbentId) = await SeedUnlockedItemAsync();
-            var challengerId = await SeedItemFor(playerId);
+            var challengerId = await SeedItemForAsync(playerId);
 
             await ApplyAsync(new ItemEquippedEvent(playerId, incumbentId, Helm), sequence: 5);
             var rejected = await ApplyAsync(new ItemEquippedEvent(playerId, challengerId, Helm), sequence: DomainEventEnvelope.Unsequenced);
@@ -483,6 +483,37 @@ namespace Game.Application.Tests.DataAccess
         }
 
         [Fact]
+        public async Task ModRemoved_EqualSequenceToTheApplyItFollows_StillRemovesTheMod()
+        {
+            var mods = await SeedModFixtureAsync();
+
+            await ApplyAsync(new ModAppliedEvent(mods.PlayerId, mods.ItemId, mods.SlotId, mods.FirstModId), sequence: 4);
+
+            // A save that swaps a mod out stamps its remove and its apply at one sequence, and the two share
+            // this stream's key by design — so the remove lands on a watermark its sibling apply just advanced
+            // to the same value. Under a strict < predicate it would be silently skipped and the mod would
+            // survive a removal the player actually made.
+            var rejected = await ApplyAsync(new ModRemovedEvent(mods.PlayerId, mods.ItemId, mods.SlotId), sequence: 4);
+
+            Assert.Equal(0, rejected);
+            Assert.Null(await ReadAppliedModAsync(mods.PlayerId, mods.ItemId, mods.SlotId));
+            Assert.Equal(4, await ReadWatermarkAsync(mods.PlayerId, PlayerWriteStream.Mods, PlayerWriteTargets.Mods.Slot(mods.ItemId, mods.SlotId)));
+        }
+
+        [Fact]
+        public async Task ModRemoved_UnsequencedEvent_AppliesAgainstAnAdvancedWatermarkAndLeavesItUnchanged()
+        {
+            var mods = await SeedModFixtureAsync();
+
+            await ApplyAsync(new ModAppliedEvent(mods.PlayerId, mods.ItemId, mods.SlotId, mods.FirstModId), sequence: 6);
+            var rejected = await ApplyAsync(new ModRemovedEvent(mods.PlayerId, mods.ItemId, mods.SlotId), sequence: DomainEventEnvelope.Unsequenced);
+
+            Assert.Equal(0, rejected);
+            Assert.Null(await ReadAppliedModAsync(mods.PlayerId, mods.ItemId, mods.SlotId));
+            Assert.Equal(6, await ReadWatermarkAsync(mods.PlayerId, PlayerWriteStream.Mods, PlayerWriteTargets.Mods.Slot(mods.ItemId, mods.SlotId)));
+        }
+
+        [Fact]
         public async Task ModApplied_ToADifferentSlotOnTheSameItem_IsGuardedIndependently()
         {
             var mods = await SeedModFixtureAsync();
@@ -508,7 +539,7 @@ namespace Game.Application.Tests.DataAccess
         public async Task ItemEquipped_DifferentItemsRacingIntoOneSlotAtEqualSequences_ConvergesToASingleOccupant()
         {
             var (playerId, firstItemId) = await SeedUnlockedItemAsync();
-            var secondItemId = await SeedItemFor(playerId);
+            var secondItemId = await SeedItemForAsync(playerId);
 
             // The idempotency suite's version of this race runs unsequenced, so it bypasses the guard and has
             // to swallow a DbUpdateException and rely on redelivery. Guarded, the two applies queue on the
@@ -695,11 +726,11 @@ namespace Game.Application.Tests.DataAccess
         private async Task<(int PlayerId, int ItemId)> SeedUnlockedItemAsync()
         {
             var playerId = await SeedPlayerAsync();
-            return (playerId, await SeedItemFor(playerId));
+            return (playerId, await SeedItemForAsync(playerId));
         }
 
         // Unlocked but unequipped, so a test's first equip is the write under test rather than seed state.
-        private async Task<int> SeedItemFor(int playerId)
+        private async Task<int> SeedItemForAsync(int playerId)
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -711,7 +742,7 @@ namespace Game.Application.Tests.DataAccess
         private async Task<ModFixture> SeedModFixtureAsync()
         {
             var playerId = await SeedPlayerAsync();
-            var itemId = await SeedItemFor(playerId);
+            var itemId = await SeedItemForAsync(playerId);
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
             var slotId = (await TestDataSeeder.AddItemModSlotAsync(context, itemId)).Id;
