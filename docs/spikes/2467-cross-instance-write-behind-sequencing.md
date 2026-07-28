@@ -378,12 +378,17 @@ if it ever proves real.
 | [#2495](https://github.com/ginderjeremiah/GameServer/issues/2495) | Part (b) — guard the equipment and mod handlers (dual-key, tombstone) | **Shipped** (#2501) |
 | [#2496](https://github.com/ginderjeremiah/GameServer/issues/2496) | Part (c) — guard the remaining single-row handlers | **Shipped** (#2502) |
 | [#2500](https://github.com/ginderjeremiah/GameServer/issues/2500) | Seed the counter from the persisted watermark on a cold load | Open — **live lost-write path** |
-| [#2475](https://github.com/ginderjeremiah/GameServer/issues/2475) | Retire `_parkedPlayerLanes`, now redundant | Open — unblocked |
+| [#2475](https://github.com/ginderjeremiah/GameServer/issues/2475) | Retire `_parkedPlayerLanes`, made redundant by the guard | **Shipped** (#2510) |
 
 The guard is complete: `DomainEventEnvelope.Sequence` carries the stamp with `Unsequenced = 0` as an
 explicit sentinel constant, `Player.AdvanceWriteSequence()` pre-increments so a cold-loaded aggregate's
 first stamp is 1, and all eleven order-sensitive handlers now compare against a `PlayerWriteWatermark` row.
-The four pure insert-if-missing handlers are deliberately unguarded, being genuinely convergent.
+The four pure insert-if-missing handlers are deliberately unguarded, being genuinely convergent. #2460's
+instance-local deferral has been retired with it, so ordering now rests on the guard alone rather than on
+two mechanisms with only one load-bearing.
+
+**#2500 is the one remaining gap**, and it is the reason the chain isn't finished: the cold-load seed below
+never shipped, so a counter that reseeds to 0 has every guarded write rejected until it climbs back.
 
 **The cold-load seed specified above is *not* live**, and that matters more now that the guard reads the
 stamp. #2473 deferred it deliberately — the table holding the watermarks didn't exist yet, and nothing
