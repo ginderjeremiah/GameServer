@@ -1104,6 +1104,83 @@ namespace Game.Core.Tests.Players
             Assert.Empty(player.DomainEvents);
         }
 
+        // ── UpdateAttributes ─────────────────────────────────────────────────
+
+        [Fact]
+        public void UpdateAttributes_RealAllocation_RaisesCoreUpdatedAndAllocationsChanged()
+        {
+            var player = MakeAllocatingPlayer();
+
+            var outcome = player.UpdateAttributes([new Update(EAttribute.Strength, 3)]);
+
+            Assert.Equal(UpdateAttributesOutcome.Changed, outcome);
+            Assert.Single(player.DomainEvents.OfType<PlayerCoreUpdatedEvent>());
+            var evt = Assert.Single(player.DomainEvents.OfType<AttributeAllocationsChangedEvent>());
+            Assert.Equal(3d, evt.Allocations.Single(a => a.Attribute == EAttribute.Strength).Amount);
+        }
+
+        [Fact]
+        public void UpdateAttributes_EmptyPayload_RaisesNoEvent()
+        {
+            // A client spamming an empty payload used to enqueue one full-allocation-set write-behind save
+            // per call, which is exactly the redundant-save spam the accepted-but-unchanged rule prevents
+            // (#2485).
+            var player = MakeAllocatingPlayer();
+
+            var outcome = player.UpdateAttributes([]);
+
+            Assert.Equal(UpdateAttributesOutcome.Unchanged, outcome);
+            Assert.Empty(player.DomainEvents);
+        }
+
+        [Fact]
+        public void UpdateAttributes_AllZeroDeltas_RaisesNoEvent()
+        {
+            var player = MakeAllocatingPlayer();
+
+            var outcome = player.UpdateAttributes([
+                new Update(EAttribute.Strength, 0),
+                new Update(EAttribute.Endurance, 0),
+            ]);
+
+            Assert.Equal(UpdateAttributesOutcome.Unchanged, outcome);
+            Assert.Empty(player.DomainEvents);
+        }
+
+        [Fact]
+        public void UpdateAttributes_DeltasSummingToZero_StillRaisesBothEvents()
+        {
+            // Nets no spend but genuinely reallocates, so it must persist — the case that stops the
+            // unchanged check from being written against the summed point total.
+            var player = MakeAllocatingPlayer();
+            Assert.Equal(
+                UpdateAttributesOutcome.Changed,
+                player.UpdateAttributes([new Update(EAttribute.Strength, 2)]));
+            player.ClearEvents();
+
+            var outcome = player.UpdateAttributes([
+                new Update(EAttribute.Strength, -2),
+                new Update(EAttribute.Endurance, 2),
+            ]);
+
+            Assert.Equal(UpdateAttributesOutcome.Changed, outcome);
+            Assert.Single(player.DomainEvents.OfType<PlayerCoreUpdatedEvent>());
+            var evt = Assert.Single(player.DomainEvents.OfType<AttributeAllocationsChangedEvent>());
+            Assert.Equal(0d, evt.Allocations.Single(a => a.Attribute == EAttribute.Strength).Amount);
+            Assert.Equal(2d, evt.Allocations.Single(a => a.Attribute == EAttribute.Endurance).Amount);
+        }
+
+        [Fact]
+        public void UpdateAttributes_RejectedPayload_RaisesNoEvent()
+        {
+            var player = MakeAllocatingPlayer();
+
+            var outcome = player.UpdateAttributes([new Update(EAttribute.MaxHealth, 1)]);
+
+            Assert.Equal(UpdateAttributesOutcome.Rejected, outcome);
+            Assert.Empty(player.DomainEvents);
+        }
+
         // ── RecordBattleCompleted — boss-mode backstop ───────────────────────
 
         [Fact]
@@ -1440,6 +1517,19 @@ namespace Game.Core.Tests.Players
 
         private static Player MakePlayer(int level = 1, int exp = 0) =>
             new PlayerBuilder().WithLevel(level).WithExp(exp).Build();
+
+        /// <summary>
+        /// A player carrying the complete zero-amount spread every real character has (seeded at creation,
+        /// repaired on rehydration) plus points to spend — so an all-zero payload is genuinely a no-op rather
+        /// than one that creates the missing rows.
+        /// </summary>
+        private static Player MakeAllocatingPlayer(int gained = 10) =>
+            new PlayerBuilder()
+                .WithStatAllocations(PlayerStatPoints.CreateAllocations())
+                .WithStatPointsGained(gained)
+                .Build();
+
+        private record Update(EAttribute Attribute, int Amount) : IAttributeUpdate;
 
         /// <summary>Builds a player whose unlocked set contains a skill for each given id (none equipped).</summary>
         private static Player MakePlayerWithUnlockedSkills(params int[] skillIds)

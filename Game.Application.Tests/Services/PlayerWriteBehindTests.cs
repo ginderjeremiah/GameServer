@@ -1,5 +1,6 @@
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
+using Game.Application.Services;
 using Game.Core;
 using Game.Core.Events;
 using Game.Core.Players;
@@ -69,11 +70,52 @@ namespace Game.Application.Tests.Services
             using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
             var db = multiplexer.GetDatabase();
 
-            // TryUpdateAttributes raises PlayerCoreUpdatedEvent + AttributeAllocationsChangedEvent
-            var updated = player.TryUpdateAttributes([new SimpleAttributeUpdate(EAttribute.Strength, 1)]);
-            Assert.True(updated);
+            // UpdateAttributes raises PlayerCoreUpdatedEvent + AttributeAllocationsChangedEvent
+            var updated = player.UpdateAttributes([new SimpleAttributeUpdate(EAttribute.Strength, 1)]);
+            Assert.Equal(UpdateAttributesOutcome.Changed, updated);
             await playerRepo.SavePlayer(player);
 
+            Assert.Equal(2, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1)]
+        [InlineData(2)]
+        public async Task UpdateAttributes_PayloadAllocatingNothing_IsAcceptedButPublishesNothing(int zeroDeltaCount)
+        {
+            // The end of the chain #2485 is about: an accepted-but-unchanged payload must reach neither the
+            // queue nor the database, so a client looping UpdatePlayerStats can't manufacture write-behind
+            // saves. Covers the empty payload and the all-zero-delta payloads alike.
+            using var scope = CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
+
+            var user = await TestDataSeeder.CreateUserAsync(context);
+            var playerEntity = await TestDataSeeder.CreatePlayerAsync(context, user.Id);
+            playerEntity.StatPointsGained = 110;
+            await context.SaveChangesAsync(CancellationToken);
+
+            var playerRepo = scope.ServiceProvider.GetRequiredService<IPlayerRepository>();
+            var playerService = scope.ServiceProvider.GetRequiredService<PlayerService>();
+            var player = await playerRepo.GetPlayer(playerEntity.Id);
+            Assert.NotNull(player);
+
+            var options = ConfigurationOptions.Parse(Containers.PubSubConnectionString);
+            using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
+            var db = multiplexer.GetDatabase();
+            Assert.Equal(0, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+
+            var updates = new[] { EAttribute.Strength, EAttribute.Endurance }
+                .Take(zeroDeltaCount)
+                .Select(attribute => new SimpleAttributeUpdate(attribute, 0))
+                .ToList();
+
+            // Accepted — it broke no rule — but nothing was allocated, so nothing may be enqueued.
+            Assert.True(await playerService.UpdateAttributes(player, updates));
+            Assert.Equal(0, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
+
+            // A real allocation on the same player still publishes, so the guard suppresses only the no-op.
+            Assert.True(await playerService.UpdateAttributes(player, [new SimpleAttributeUpdate(EAttribute.Strength, 3)]));
             Assert.Equal(2, await db.ListLengthAsync(Constants.PUBSUB_PLAYER_QUEUE));
         }
 
@@ -267,9 +309,9 @@ namespace Game.Application.Tests.Services
             using var multiplexer = await ConnectionMultiplexer.ConnectAsync(options);
             var db = multiplexer.GetDatabase();
 
-            // TryUpdateAttributes raises two events; both belong to one save of one consistent aggregate state,
+            // UpdateAttributes raises two events; both belong to one save of one consistent aggregate state,
             // so they share a sequence — it orders saves against each other, not events within a save (#2473).
-            Assert.True(player.TryUpdateAttributes([new SimpleAttributeUpdate(EAttribute.Strength, 1)]));
+            Assert.Equal(UpdateAttributesOutcome.Changed, player.UpdateAttributes([new SimpleAttributeUpdate(EAttribute.Strength, 1)]));
             await playerRepo.SavePlayer(player);
 
             player.ChangeZone(1);
