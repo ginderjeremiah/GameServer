@@ -226,19 +226,21 @@ statistic Y landed first. Progress events carry only a save's *dirty* rows, so a
 silently drop live writes on the game's highest-volume path.
 
 `Stream` is a small enum (one per guarded handler); `TargetKey` is the canonical identity of the write
-target within that stream (`""` for the genuinely player-scoped streams, `"7:19"` for a
+target within that stream (`""` for the genuinely player-scoped streams, `"stat:7:19"` for a
 `(statisticType, entityId)` pair).
 
-**Where a stream carries more than one *kind* of target, the key must be qualified by kind** — `"i:42"` for
-an item, `"s:3"` for a slot. The watermark row's identity is `(PlayerId, Stream, TargetKey)`, and the
-equipment stream keys on both an item and a slot (below), so bare ids would make **item 3 and slot 3 the
-same row**. Slot ids are small and dense and item ids start low, so that overlap is most of the low id
+**Where a stream carries more than one *kind* of target, the key must be qualified by kind** — an item key
+and a slot key distinguished by their prefix, the exact spelling owned by the stream. The watermark row's
+identity is `(PlayerId, Stream, TargetKey)`, and the equipment stream keys on both an item and a slot
+(below), so bare ids would make **item 3 and slot 3 the same row**. Slot ids are small and dense and item ids start low, so that overlap is most of the low id
 range, not a corner case. Two things would break, both the failure this section rejects a per-player
 watermark over: the dual-key check would silently collapse to a single key whenever `ItemId == SlotId` (the
 guard de-duplicates its key set, since `ON CONFLICT DO UPDATE` cannot affect one row twice in a statement),
 and equipping item 3 would advance the watermark that also guards slot 3, so a reordered older event
 targeting slot 3 would be rejected against a sequence set by a write to a different, still-current target.
 An ordinal sort over prefixed keys is still a total order, so the deterministic lock order is unaffected.
+The shipped `Progress` stream already follows this — `"stat:{typeId}:{entityId}"`, `"challenge:{id}"`,
+`"prof:{id}"` — for the same reason, since it too carries three kinds of target in one stream.
 
 Chosen over **per-row version columns** on the
 six-plus affected tables because:
@@ -277,9 +279,12 @@ alone has a hole.
 **The two checks are all-or-nothing.** If one key passes and the other rejects, the whole apply rolls back
 with *neither* watermark advanced — a partial advance would leave one key claiming a write that never
 happened, which is the same silently-lost-write shape the transaction requirement above exists to prevent.
-The surrounding transaction gives this for free, but it is too load-bearing to leave to inference. The
-other cost is two watermark rows locked per equip, so #2474 must lock them in a deterministic order (item
-then slot) to avoid deadlocking two concurrent equips against each other.
+The surrounding transaction gives this for free, but it is too load-bearing to leave to inference. It must
+still be **disposed of as §3 requires** — rolled back and acknowledged as a no-op, not signalled by an
+exception, which would escape the handler and dead-letter an ordinary reordering. The other cost is two
+watermark rows locked per equip, which needs a deterministic lock order or two concurrent equips deadlock
+against each other; the shipped guard supplies that generically (the upsert's own `ORDER BY` over the
+ordinal-sorted key set), so no per-handler ordering rule is needed.
 
 ### 3. How a stale event is disposed of — acknowledged, counted, and surfaced
 
