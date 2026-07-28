@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using Game.Infrastructure.Database;
 using Game.Infrastructure.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +36,39 @@ namespace Game.DataAccess.PlayerUpdates
         public const string PlayerScopedTarget = "";
 
         /// <summary>
+        /// Formats a target key from the ids that identify it, optionally prefixed by <paramref name="kind"/>
+        /// where one stream keys more than one row family. A <c>null</c> id renders as an empty segment —
+        /// how a global statistic's absent entity id is spelled.
+        /// </summary>
+        /// <remarks>
+        /// Callers go through this rather than interpolating because a target key is a <em>persisted
+        /// comparison key</em>: formatted under a culture whose numeric formatting differs (the negative sign,
+        /// in practice — CA1305), a caller would seed a second watermark row and the guard would silently stop
+        /// seeing the first. Same reasoning as handing the apply callback its <see cref="GameContext"/> — the
+        /// invariant is better held by the guard than by every caller's discipline.
+        /// </remarks>
+        public static string Target(string kind, params ReadOnlySpan<int?> ids)
+        {
+            var key = new StringBuilder(kind);
+            foreach (var id in ids)
+            {
+                key.Append(':');
+                if (id.HasValue)
+                {
+                    key.Append(id.Value.ToString(CultureInfo.InvariantCulture));
+                }
+            }
+
+            return key.ToString();
+        }
+
+        /// <summary>
+        /// Formats the target key of a stream whose targets are identified by a bare id, with no row family
+        /// to disambiguate. See the prefixed overload for why this isn't interpolated at the call site.
+        /// </summary>
+        public static string Target(int id) => id.ToString(CultureInfo.InvariantCulture);
+
+        /// <summary>
         /// Advances the watermarks this event is allowed to advance and invokes <paramref name="applyAsync"/>
         /// with exactly those target keys, all inside one transaction. A key whose watermark already holds a
         /// <em>higher</em> sequence is rejected: it is not passed to <paramref name="applyAsync"/>, which must
@@ -50,11 +85,23 @@ namespace Game.DataAccess.PlayerUpdates
         /// <para>
         /// Rejection is per target, not per event, because a progress event carries only a save's dirty rows —
         /// an all-or-nothing rule would let a newer event covering one statistic discard an older event's
-        /// entirely different, still-current statistic. A handler that genuinely needs all-or-nothing (the
-        /// equipment stream's item+slot pair) gets it by throwing from <paramref name="applyAsync"/> when the
-        /// accepted set is short, which rolls the transaction back with no watermark advanced.
+        /// entirely different, still-current statistic. A handler whose write spans several targets
+        /// indivisibly (the equipment stream's item+slot pair) opts out with
+        /// <paramref name="allTargetsRequired"/>.
         /// </para>
         /// </summary>
+        /// <param name="allTargetsRequired">
+        /// When <see langword="true"/>, a single rejected key rejects the whole event: the apply is skipped
+        /// and <em>no</em> watermark advances. An equip writes the item's row and the destination slot's
+        /// occupancy as one indivisible change, so a partial advance would leave the accepted key claiming a
+        /// write that never happened, and the next event older than it would then be wrongly rejected.
+        /// <para>
+        /// The rejection is a rollback rather than a throw. A superseded event is completed work, not a
+        /// failure — an exception escaping the handler routes it to the queue's retry and then the
+        /// dead-letter queue, which would turn every ordinary reordering into an operator-visible poison
+        /// message.
+        /// </para>
+        /// </param>
         /// <remarks>
         /// Takes no <c>CancellationToken</c> by design — see <see cref="IPlayerUpdateHandler{TEvent}"/> (#1029).
         /// </remarks>
@@ -62,11 +109,12 @@ namespace Game.DataAccess.PlayerUpdates
             int playerId,
             PlayerWriteStream stream,
             IReadOnlyCollection<string> targetKeys,
-            Func<GameContext, IReadOnlySet<string>, Task> applyAsync)
+            Func<GameContext, IReadOnlySet<string>, Task> applyAsync,
+            bool allTargetsRequired = false)
         {
             try
             {
-                await AttemptAsync(playerId, stream, targetKeys, applyAsync);
+                await AttemptAsync(playerId, stream, targetKeys, applyAsync, allTargetsRequired);
             }
             catch (DbUpdateException ex) when (ex.IsUniqueViolation())
             {
@@ -79,7 +127,7 @@ namespace Game.DataAccess.PlayerUpdates
                 // may have advanced them while this attempt was unwinding, and a cached accepted-set would
                 // apply against a decision that is no longer true.
                 context.ChangeTracker.Clear();
-                await AttemptAsync(playerId, stream, targetKeys, applyAsync);
+                await AttemptAsync(playerId, stream, targetKeys, applyAsync, allTargetsRequired);
             }
         }
 
@@ -87,7 +135,8 @@ namespace Game.DataAccess.PlayerUpdates
             int playerId,
             PlayerWriteStream stream,
             IReadOnlyCollection<string> targetKeys,
-            Func<GameContext, IReadOnlySet<string>, Task> applyAsync)
+            Func<GameContext, IReadOnlySet<string>, Task> applyAsync,
+            bool allTargetsRequired)
         {
             // Distinct because ON CONFLICT DO UPDATE cannot affect the same row twice in one statement. The
             // sort only makes the parameter array deterministic — lock acquisition order is governed by the
@@ -110,6 +159,22 @@ namespace Game.DataAccess.PlayerUpdates
             await using var transaction = await context.Database.BeginTransactionAsync();
 
             var accepted = await AdvanceWatermarksAsync(playerId, stream, keys, updateContext.Sequence);
+
+            // An indivisible multi-target write is rejected outright when any one of its keys is superseded,
+            // and the rollback un-advances the keys that did pass — an advance without the write behind it
+            // would make the next, genuinely older event look already applied and be skipped for good.
+            //
+            // This is the one rollback whose rejections still count (see the note on the commit path below):
+            // the event was deliberately skipped as superseded, not lost to a fault. The whole key set counts,
+            // including the keys that passed, because what was rejected is the event — so an equip reports two
+            // targets rather than the one that actually lost the comparison.
+            if (allTargetsRequired && accepted.Count < keys.Length)
+            {
+                await transaction.RollbackAsync();
+                updateContext.RecordRejectedTargets(keys.Length);
+                return;
+            }
+
             if (accepted.Count > 0)
             {
                 await applyAsync(context, accepted);
@@ -117,8 +182,11 @@ namespace Game.DataAccess.PlayerUpdates
 
             await transaction.CommitAsync();
 
-            // Counted only once the transaction has actually committed, so an apply that rolled back doesn't
-            // report rejections that were themselves rolled back. The drain surfaces the per-pass total.
+            // Counted only once the transaction has actually committed, so an apply that *faulted* doesn't
+            // report rejections that were themselves rolled back — it never reaches here. That is about lost
+            // work, not about rollbacks generally: the deliberate all-or-nothing rejection above rolls back
+            // and still counts, because there the skip is the outcome rather than a casualty of it. The drain
+            // surfaces the per-pass total.
             updateContext.RecordRejectedTargets(keys.Length - accepted.Count);
         }
 

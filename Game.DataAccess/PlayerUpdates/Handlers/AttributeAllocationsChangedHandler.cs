@@ -5,26 +5,20 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Game.DataAccess.PlayerUpdates.Handlers
 {
-    internal sealed class AttributeAllocationsChangedHandler(GameContext context) : IPlayerUpdateHandler<AttributeAllocationsChangedEvent>
+    internal sealed class AttributeAllocationsChangedHandler(PlayerWriteWatermarkGuard guard) : IPlayerUpdateHandler<AttributeAllocationsChangedEvent>
     {
-        public async Task HandleAsync(AttributeAllocationsChangedEvent evt)
-        {
-            // The load-then-upsert isn't atomic, so a concurrent apply of the same at-least-once event can
-            // insert a (player, attribute) row between our load and save. On the resulting unique violation,
-            // clear and re-run once: the now-existing row loads as an update, so the second pass carries no
-            // conflicting insert. A second failure propagates to the queue's retry policy rather than looping.
-            try
-            {
-                await ApplyAsync(evt);
-            }
-            catch (DbUpdateException ex) when (ex.IsUniqueViolation())
-            {
-                context.ChangeTracker.Clear();
-                await ApplyAsync(evt);
-            }
-        }
+        // A stale replay durably reverts spent stat points while Player.StatPointsUsed may already hold the
+        // newer value, leaving the two disagreeing until the player reallocates. Player-scoped — see
+        // PlayerWriteStream.AttributeAllocations. The guard owns the transaction, the context the write must
+        // be issued on, and the unique-violation restart the load-then-upsert below needs.
+        public Task HandleAsync(AttributeAllocationsChangedEvent evt)
+            => guard.ExecuteGuardedAsync(
+                evt.PlayerId,
+                PlayerWriteStream.AttributeAllocations,
+                [PlayerWriteWatermarkGuard.PlayerScopedTarget],
+                (context, _) => ApplyAsync(context, evt));
 
-        private async Task ApplyAsync(AttributeAllocationsChangedEvent evt)
+        private static async Task ApplyAsync(GameContext context, AttributeAllocationsChangedEvent evt)
         {
             var currentRows = await context.PlayerAttributes
                 .Where(pa => pa.PlayerId == evt.PlayerId)

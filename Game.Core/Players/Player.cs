@@ -117,18 +117,25 @@ namespace Game.Core.Players
             return true;
         }
 
-        public bool TryUpdateAttributes(IEnumerable<IAttributeUpdate> changedAttributes)
+        /// <summary>
+        /// Applies a set of per-attribute stat-point deltas, returning which outcome occurred. Events are
+        /// raised only on a real change: an accepted-but-unchanged payload leaves both the allocations and
+        /// <c>StatPointsUsed</c> untouched, so re-raising them would enqueue a write-behind save that
+        /// rewrites the state it already holds (#2485).
+        /// </summary>
+        public UpdateAttributesOutcome UpdateAttributes(IEnumerable<IAttributeUpdate> changedAttributes)
         {
-            if (!StatPoints.TryUpdateAttributes(changedAttributes))
+            var outcome = StatPoints.UpdateAttributes(changedAttributes);
+            if (outcome != UpdateAttributesOutcome.Changed)
             {
-                return false;
+                return outcome;
             }
 
             RaiseCoreUpdated();
             RaiseEvent(new AttributeAllocationsChangedEvent(
                 Id,
                 StatPoints.StatAllocations.Select(a => new AttributeAllocationEntry(a.Attribute, a.Amount)).ToList()));
-            return true;
+            return outcome;
         }
 
         /// <summary>

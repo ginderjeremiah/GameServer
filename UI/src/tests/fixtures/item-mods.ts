@@ -4,16 +4,10 @@ import { EItemModType, ERarity, type IItemMod } from '$lib/api';
    a module of its own rather than joining `makeItem`: `IItem` and `IItemMod` are separate contracts
    that drift independently, even though a suite exercising applied mods usually imports both.
 
-   The target set was confirmed with the throwaway-required-field probe, not a `grep` — only a suite
-   that constructs a *typed* `IItemMod` pays the contract-drift tax. Two exclusions are deliberate and
-   permanent: the production blank record (`routes/admin/workbench/entities/item-mod.ts`) and the live
-   `ItemMod` domain class (`lib/battle/item-mod.ts`) are the authoritative shapes and correctly stay
-   literals. A `grep` still finding mod literals under `src/tests/` is expected, not a gap.
-
-   A third class was invisible to the probe rather than excluded: a literal asserted `as IItemMod`
-   keeps compiling when the contract gains a required field. #2447 folded those in
-   (`challenges/OverviewPane.test.ts`, `lib/common/challenge-unlocks.test.ts`); reintroducing such a
-   cast re-opens the hole, so state why if you do. */
+   Two exclusions are deliberate and permanent: the production blank record
+   (`routes/admin/workbench/entities/item-mod.ts`) and the live `ItemMod` domain class
+   (`lib/battle/item-mod.ts`) are authoritative shapes in their own right. See `docs/frontend.md` →
+   Testing Guidelines for the contract-drift rule. */
 
 /**
  * Builds an {@link IItemMod} reference-data entry for tests. Everything but the id is a neutral

@@ -80,7 +80,7 @@ namespace Game.Application.Tests.Services
         }
 
         [Fact]
-        public async Task TryUpdateAttributes_ValidUpdate_ReturnsTrue()
+        public async Task UpdateAttributes_ValidUpdate_ReturnsTrue()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -106,13 +106,13 @@ namespace Game.Application.Tests.Services
                 new(EAttribute.Strength, Amount: 3),
             };
 
-            var result = await playerService.TryUpdateAttributes(player, updates);
+            var result = await playerService.UpdateAttributes(player, updates);
 
             Assert.True(result);
         }
 
         [Fact]
-        public async Task TryUpdateAttributes_SpendMoreThanAvailable_ReturnsFalse()
+        public async Task UpdateAttributes_SpendMoreThanAvailable_ReturnsFalse()
         {
             using var scope = CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<GameContext>();
@@ -135,13 +135,13 @@ namespace Game.Application.Tests.Services
                 new(EAttribute.Strength, Amount: 999),
             };
 
-            var result = await playerService.TryUpdateAttributes(player, updates);
+            var result = await playerService.UpdateAttributes(player, updates);
 
             Assert.False(result);
         }
 
         [Fact]
-        public async Task TryUpdateAttributes_ThenDrainedAndReloadedFromDb_KeepsEveryCoreAttributeRow()
+        public async Task UpdateAttributes_ThenDrainedAndReloadedFromDb_KeepsEveryCoreAttributeRow()
         {
             // The full loop #2459 broke: allocate → write-behind drain → Redis key lapses → DB fall-through
             // reload. The event carries the player's whole allocation list, zeros included, so a handler that
@@ -162,7 +162,7 @@ namespace Game.Application.Tests.Services
             var player = await playerRepo.GetPlayer(playerEntity.Id);
             Assert.NotNull(player);
 
-            Assert.True(await playerService.TryUpdateAttributes(player, [new SimpleAttributeUpdate(EAttribute.Strength, 3)]));
+            Assert.True(await playerService.UpdateAttributes(player, [new SimpleAttributeUpdate(EAttribute.Strength, 3)]));
             await DrainPlayerUpdateQueue(scope.ServiceProvider);
 
             // Drop the cached blob so the reload is a genuine DB fall-through rather than a Redis hit that
@@ -185,7 +185,7 @@ namespace Game.Application.Tests.Services
             var reloaded = await verifyScope.ServiceProvider.GetRequiredService<IPlayerRepository>().GetPlayer(playerEntity.Id);
             Assert.NotNull(reloaded);
             var reloadedService = verifyScope.ServiceProvider.GetRequiredService<PlayerService>();
-            Assert.True(await reloadedService.TryUpdateAttributes(reloaded, [new SimpleAttributeUpdate(EAttribute.Dexterity, 2)]));
+            Assert.True(await reloadedService.UpdateAttributes(reloaded, [new SimpleAttributeUpdate(EAttribute.Dexterity, 2)]));
             Assert.Equal(2d, reloaded.StatPoints.StatAllocations.Single(a => a.Attribute == EAttribute.Dexterity).Amount);
         }
 

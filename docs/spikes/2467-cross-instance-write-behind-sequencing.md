@@ -225,9 +225,14 @@ worse — an older `ProgressUpdated` carrying statistic X discarded because a ne
 statistic Y landed first. Progress events carry only a save's *dirty* rows, so a coarse watermark would
 silently drop live writes on the game's highest-volume path.
 
-`Stream` is a small enum (one per guarded handler); `TargetKey` is the canonical identity of the write
-target within that stream (`""` for the genuinely player-scoped streams, `"stat:7:19"` for a
-`(statisticType, entityId)` pair).
+`Stream` is a small enum with **one value per target space, not per handler**; `TargetKey` is the canonical
+identity of the write target within that stream (`""` for the genuinely player-scoped streams, `"stat:7:19"`
+for a `(statisticType, entityId)` pair). Per-space rather than per-handler because two handlers writing the
+*same* rows have to share a stream or they cannot order against each other at all — a stale `ModApplied` is
+only rejected because `ModRemoved` advanced the very watermark it compares against, which is the whole
+tombstone argument below. The converse also holds: handlers writing *disjoint columns of a shared row* stay
+separate (equipment vs. the favorite flag on the same `UnlockedItem`), since ordering those against each
+other would reject writes that aren't stale in any sense that matters.
 
 **Where a stream carries more than one *kind* of target, the key must be qualified by kind** — an item key
 and a slot key distinguished by their prefix, the exact spelling owned by the stream. The watermark row's
@@ -370,22 +375,28 @@ if it ever proves real.
 |---|---|---|
 | [#2473](https://github.com/ginderjeremiah/GameServer/issues/2473) | Carry a per-player write sequence on the envelope and the producing aggregates | **Shipped** (#2492), minus the cold-load seed |
 | [#2474](https://github.com/ginderjeremiah/GameServer/issues/2474) | Add `PlayerWriteWatermark` and guard the absolute-value handlers against stale writes | Part (a) **shipped** (#2494): the table, the guard helper, rejection accounting, `PlayerCore` + `Progress` |
-| [#2495](https://github.com/ginderjeremiah/GameServer/issues/2495) | Part (b) — guard the equipment and mod handlers (dual-key, tombstone) | Open |
-| [#2496](https://github.com/ginderjeremiah/GameServer/issues/2496) | Part (c) — guard the remaining single-row handlers | Open |
+| [#2495](https://github.com/ginderjeremiah/GameServer/issues/2495) | Part (b) — guard the equipment and mod handlers (dual-key, tombstone) | **Shipped** (#2501) |
+| [#2496](https://github.com/ginderjeremiah/GameServer/issues/2496) | Part (c) — guard the remaining single-row handlers | **Shipped** (#2502) |
 | [#2500](https://github.com/ginderjeremiah/GameServer/issues/2500) | Seed the counter from the persisted watermark on a cold load | Open — **live lost-write path** |
-| [#2475](https://github.com/ginderjeremiah/GameServer/issues/2475) | Retire `_parkedPlayerLanes` once the guard covers every handler | Open, blocked on #2495 + #2496 |
+| [#2475](https://github.com/ginderjeremiah/GameServer/issues/2475) | Retire `_parkedPlayerLanes`, now redundant | Open — unblocked |
 
-The stamp is live and now read: `DomainEventEnvelope.Sequence` carries it with `Unsequenced = 0` as an
+The guard is complete: `DomainEventEnvelope.Sequence` carries the stamp with `Unsequenced = 0` as an
 explicit sentinel constant, `Player.AdvanceWriteSequence()` pre-increments so a cold-loaded aggregate's
-first stamp is 1, and #2494's guard consumes it for the core and progress streams.
+first stamp is 1, and all eleven order-sensitive handlers now compare against a `PlayerWriteWatermark` row.
+The four pure insert-if-missing handlers are deliberately unguarded, being genuinely convergent.
 
 **The cold-load seed specified above is *not* live**, and that matters more now that the guard reads the
 stamp. #2473 deferred it deliberately — the table holding the watermarks didn't exist yet, and nothing
-consumed the stamp, so a cold load reseeding from 0 was harmless. #2494 removed that precondition. Until
-#2500 lands, a returning player whose cache lapsed reseeds at 0, stamps 1, and has every guarded write
-rejected against their own previous high-water mark: self-healing for `PlayerCore` (absolute, so a later
-save repairs it) but **permanent for progress rows touched only inside that window**, since those carry
-only a save's dirty set and are never re-dirtied.
+consumed the stamp, so a cold load reseeding from 0 was harmless. #2494 removed that precondition, and
+#2501/#2502 widened the blast radius to every stream. Until #2500 lands, a returning player whose cache
+lapsed reseeds at 0, stamps 1, and has **every** guarded write rejected against their own previous
+high-water mark until the counter climbs back past it.
+
+Only the whole-state streams self-heal: `PlayerCore`, `SelectedSkills` and `AttributeAllocations` each
+carry the player's complete current state, so the first save past the old high-water mark repairs the row.
+The per-target streams do not — `Progress`, `Equipment`, `Mods`, `LogPreference`, `ItemFavorite` and
+`LessonRead` all carry only what one save touched, so a statistic, challenge completion, equip, mod, or
+preference changed **only** inside the rejected window is never re-written and stays wrong permanently.
 
 The lesson worth carrying: that deferral was recorded only in two code comments and in neither this table
 nor #2474's body, which is precisely why it survived into a shipped guard. A deferral that crosses an issue

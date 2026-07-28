@@ -47,7 +47,7 @@ namespace Game.Core
 
         /// <summary>
         /// The size of the per-level <em>free pool</em> — the stat points awarded on each level-up for the
-        /// player to allocate manually (through <c>PlayerStatPoints.TryUpdateAttributes</c>). This is the
+        /// player to allocate manually (through <c>PlayerStatPoints.UpdateAttributes</c>). This is the
         /// reduced share of attribute growth; the level-scaled class locked base (the attribute fingerprint)
         /// supplies the rest and is non-reallocatable (spike #1126 area D). A strawman to tune during
         /// balancing — the auto/free split.

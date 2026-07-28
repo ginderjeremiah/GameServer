@@ -20,22 +20,27 @@ vi.mock('$stores', () => ({ staticData, toastError: vi.fn(), dangerModal }));
 
 import WorkbenchDetail from '$routes/admin/workbench/components/WorkbenchDetail.svelte';
 import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
-import type { EntityConfig, Identified } from '$routes/admin/workbench/entities/types';
+import type { Identified } from '$routes/admin/workbench/entities/types';
+import { makeEntityConfig } from '../../../fixtures/workbench-config';
 
+/* The extra field is optional so `Row` stays interchangeable with the bare `Identified` the detail pane
+   and store are typed against. `EntityConfig<T>` puts `T` in contravariant positions — `listBadge`'s
+   parameter and every `FieldConfig.key` (`keyof T & string`) — so widening a `Row` config to an
+   `Identified` one needs `Identified` assignable to `Row`, which holds only while `value` is optional.
+   A required one fails (the compiler names `listBadge`, the first such member it reaches) and would
+   force a cast back at every render site, which is what production's `asEntity` does. */
 interface Row extends Identified {
-	value: number;
+	value?: number;
 }
 
-const makeConfig = (retireable = false, key = 'rows'): EntityConfig<Identified> =>
-	({
+const makeConfig = (retireable = false, key = 'rows') =>
+	makeEntityConfig<Row>({
 		key,
+		// The empty-state copy ("No skills left" / "New Skill") is derived from these, and asserted below.
 		label: 'Skills',
 		singular: 'Skill',
-		glyph: 'box',
-		blankName: 'Unnamed',
 		retireable,
-		newItem: (id: number) => ({ id, name: '', value: 0 }),
-		meta: () => [],
+		newItem: (id) => ({ id, name: '', value: 0 }),
 		sections: [
 			{
 				key: 'identity',
@@ -48,10 +53,8 @@ const makeConfig = (retireable = false, key = 'rows'): EntityConfig<Identified> 
 				]
 			}
 		],
-		listBadge: (rec: Row) => rec.name ?? null,
-		refresh: async () => [],
-		persist: async () => []
-	}) as unknown as EntityConfig<Identified>;
+		listBadge: (rec) => rec.name ?? null
+	});
 
 const seed: Row[] = [{ id: 1, name: 'Fireball', value: 50 }];
 
@@ -190,7 +193,7 @@ describe('WorkbenchDetail — with a record', () => {
 });
 
 describe('WorkbenchDetail — retire lifecycle', () => {
-	const renderWith = (s: EntityStore<Identified>, rec: Identified) =>
+	const renderWith = (s: EntityStore<Row>, rec: Row) =>
 		render(WorkbenchDetail, {
 			props: {
 				entity: makeConfig(true),
@@ -242,7 +245,7 @@ describe('WorkbenchDetail — retire lifecycle', () => {
 });
 
 describe('WorkbenchDetail — retire confirm dialog', () => {
-	const renderEnemy = (s: EntityStore<Identified>, rec: Identified) =>
+	const renderEnemy = (s: EntityStore<Row>, rec: Row) =>
 		render(WorkbenchDetail, {
 			props: {
 				entity: makeConfig(true, 'enemies'),
@@ -303,7 +306,7 @@ describe('WorkbenchDetail — retire confirm dialog', () => {
 });
 
 describe('WorkbenchDetail — delete confirm dialog (tags)', () => {
-	const renderTag = (s: EntityStore<Identified>, rec: Identified) =>
+	const renderTag = (s: EntityStore<Row>, rec: Row) =>
 		render(WorkbenchDetail, {
 			props: {
 				entity: makeConfig(false, 'tags'),

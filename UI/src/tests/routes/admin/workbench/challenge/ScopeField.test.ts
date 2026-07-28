@@ -17,22 +17,17 @@ vi.mock('$stores', () => ({ toastError: vi.fn() }));
 
 import ScopeField from '$routes/admin/workbench/components/challenge/ScopeField.svelte';
 import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
-import type { EntityConfig, Identified } from '$routes/admin/workbench/entities/types';
+import type { Identified } from '$routes/admin/workbench/entities/types';
 import { makeChallenge } from '../../../../fixtures/challenges';
+import { makeEntityConfig } from '../../../../fixtures/workbench-config';
 
-const config = (): EntityConfig<Identified> =>
-	({
+const config = () =>
+	makeEntityConfig<Identified>({
 		key: 'challenges',
 		label: 'Challenges',
 		singular: 'Challenge',
-		glyph: 'box',
-		blankName: 'Unnamed',
-		newItem: (id: number) => ({ id }),
-		meta: () => [],
-		sections: [],
-		refresh: async () => [],
-		persist: async () => []
-	}) as unknown as EntityConfig<Identified>;
+		newItem: (id) => ({ id })
+	});
 
 const setup = (over: Partial<IChallenge>) => {
 	/* The type and entity dimension are stated rather than inherited: every case here turns on the scope

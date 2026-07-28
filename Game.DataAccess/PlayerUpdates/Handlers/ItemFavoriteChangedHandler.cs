@@ -5,27 +5,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Game.DataAccess.PlayerUpdates.Handlers
 {
-    internal sealed class ItemFavoriteChangedHandler(GameContext context) : IPlayerUpdateHandler<ItemFavoriteChangedEvent>
+    internal sealed class ItemFavoriteChangedHandler(PlayerWriteWatermarkGuard guard) : IPlayerUpdateHandler<ItemFavoriteChangedEvent>
     {
-        public async Task HandleAsync(ItemFavoriteChangedEvent evt)
-        {
-            // The load-then-upsert isn't atomic, so a concurrent apply of the same at-least-once event — or an
-            // ItemUnlockedEvent reordered behind this one — can insert the (player, item) row between our load
-            // and save. On the resulting unique violation, clear and re-run once: the now-existing row loads as
-            // an update, so the second pass carries no conflicting insert. A second failure propagates to the
-            // queue's retry policy rather than looping. (Mirrors AttributeAllocationsChangedHandler.)
-            try
-            {
-                await ApplyAsync(evt);
-            }
-            catch (DbUpdateException ex) when (ex.IsUniqueViolation())
-            {
-                context.ChangeTracker.Clear();
-                await ApplyAsync(evt);
-            }
-        }
+        // Keyed per item — see PlayerWriteStream.ItemFavorite for why that granularity is the contract.
+        public Task HandleAsync(ItemFavoriteChangedEvent evt)
+            => guard.ExecuteGuardedAsync(
+                evt.PlayerId,
+                PlayerWriteStream.ItemFavorite,
+                [PlayerWriteWatermarkGuard.Target(evt.ItemId)],
+                (context, _) => ApplyAsync(context, evt));
 
-        private async Task ApplyAsync(ItemFavoriteChangedEvent evt)
+        private static async Task ApplyAsync(GameContext context, ItemFavoriteChangedEvent evt)
         {
             // Absolute upsert of the favorite flag. A favorite presupposes ownership, so a missing row means the
             // item's ItemUnlockedEvent was reordered behind this event under best-effort cross-instance ordering

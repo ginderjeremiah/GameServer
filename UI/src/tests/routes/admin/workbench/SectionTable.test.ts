@@ -5,7 +5,8 @@ vi.mock('$stores', () => ({ toastError: vi.fn() }));
 
 import SectionTable from '$routes/admin/workbench/components/SectionTable.svelte';
 import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
-import type { EntityConfig, Identified, TableSectionConfig } from '$routes/admin/workbench/entities/types';
+import type { Identified, TableSectionConfig } from '$routes/admin/workbench/entities/types';
+import { makeEntityConfig } from '../../../fixtures/workbench-config';
 
 interface Spawn {
 	zoneId: number;
@@ -39,19 +40,7 @@ const section: TableSectionConfig<Row> = {
 	]
 };
 
-const config = (): EntityConfig<Row> =>
-	({
-		key: 'rows',
-		label: 'Rows',
-		singular: 'Row',
-		glyph: 'box',
-		blankName: 'Unnamed',
-		newItem: (id: number) => ({ id, spawns: [] }),
-		meta: () => [],
-		sections: [section],
-		refresh: async () => [],
-		persist: async () => []
-	}) as unknown as EntityConfig<Row>;
+const config = () => makeEntityConfig<Row>({ newItem: (id) => ({ id, spawns: [] }), sections: [section] });
 
 const setup = (spawns: Spawn[]) => {
 	const store = new EntityStore(config(), [{ id: 1, spawns }]);
@@ -198,19 +187,8 @@ const effectSection: TableSectionConfig<EffectRow> = {
 };
 
 describe('SectionTable — surrogate-id collections', () => {
-	const config = (): EntityConfig<EffectRow> =>
-		({
-			key: 'rows',
-			label: 'Rows',
-			singular: 'Row',
-			glyph: 'box',
-			blankName: 'Unnamed',
-			newItem: (id: number) => ({ id, effects: [] }),
-			meta: () => [],
-			sections: [effectSection],
-			refresh: async () => [],
-			persist: async () => []
-		}) as unknown as EntityConfig<EffectRow>;
+	const config = () =>
+		makeEntityConfig<EffectRow>({ newItem: (id) => ({ id, effects: [] }), sections: [effectSection] });
 
 	it('assigns each new row a unique negative id so identities never collide', async () => {
 		const store = new EntityStore(config(), [{ id: 1, effects: [] }]);
@@ -265,19 +243,7 @@ const stepSection: TableSectionConfig<StepRow> = {
 };
 
 describe('SectionTable — editable-identity (rowKey) collections', () => {
-	const config = (): EntityConfig<StepRow> =>
-		({
-			key: 'rows',
-			label: 'Rows',
-			singular: 'Row',
-			glyph: 'box',
-			blankName: 'Unnamed',
-			newItem: (id: number) => ({ id, steps: [] }),
-			meta: () => [],
-			sections: [stepSection],
-			refresh: async () => [],
-			persist: async () => []
-		}) as unknown as EntityConfig<StepRow>;
+	const config = () => makeEntityConfig<StepRow>({ newItem: (id) => ({ id, steps: [] }), sections: [stepSection] });
 
 	it('swaps identities instead of duplicating them when an edit collides with a sibling row', async () => {
 		const store = new EntityStore(config(), [

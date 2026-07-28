@@ -5,6 +5,7 @@ vi.mock('$stores', () => ({ toastError: vi.fn() }));
 import { EntityStore } from '../../../../routes/admin/workbench/entity-store.svelte';
 import { PersistFailedError } from '../../../../routes/admin/workbench/save-helpers';
 import type { EntityConfig, Identified, SaveDiff } from '../../../../routes/admin/workbench/entities/types';
+import { makeEntityConfig } from '../../../fixtures/workbench-config';
 
 interface Row extends Identified {
 	id: number;
@@ -18,18 +19,7 @@ const persistResult = (records: Row[], idMap = new Map<number, number>()) => ({ 
 const makeConfig = (
 	persist: (diff: SaveDiff<Row>) => Promise<{ records: Row[]; idMap: Map<number, number> }> = async () =>
 		persistResult([])
-): EntityConfig<Row> => ({
-	key: 'rows',
-	label: 'Rows',
-	singular: 'Row',
-	glyph: 'box',
-	blankName: 'Unnamed',
-	newItem: (id) => ({ id, name: '', value: 0 }),
-	meta: () => [],
-	sections: [],
-	refresh: async () => [],
-	persist
-});
+) => makeEntityConfig<Row>({ newItem: (id) => ({ id, name: '', value: 0 }), persist });
 
 const seed: Row[] = [
 	{ id: 0, name: 'Alpha', value: 1 },
