@@ -23,9 +23,12 @@ import { EntityStore } from '$routes/admin/workbench/entity-store.svelte';
 import type { Identified } from '$routes/admin/workbench/entities/types';
 import { makeEntityConfig } from '../../../fixtures/workbench-config';
 
-/* The extra field is optional so `Row` stays interchangeable with the bare `Identified` the detail
-   pane and store are typed against — a required one would make a `Row`-typed config invariant against
-   them (through `listBadge`) and force a cast back at every render site. */
+/* The extra field is optional so `Row` stays interchangeable with the bare `Identified` the detail pane
+   and store are typed against. `EntityConfig<T>` puts `T` in contravariant positions — `listBadge`'s
+   parameter and every `FieldConfig.key` (`keyof T & string`) — so widening a `Row` config to an
+   `Identified` one needs `Identified` assignable to `Row`, which holds only while `value` is optional.
+   A required one fails (the compiler names `listBadge`, the first such member it reaches) and would
+   force a cast back at every render site, which is what production's `asEntity` does. */
 interface Row extends Identified {
 	value?: number;
 }

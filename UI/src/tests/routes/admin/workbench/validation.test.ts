@@ -91,6 +91,7 @@ describe('sectionWarnings', () => {
 			key: 'rows',
 			label: 'Rows',
 			glyph: 'bars',
+			// `usage` rather than the `table` its production counterpart uses — see the note above.
 			kind: 'usage',
 			// Mirrors zone.ts's isHome gap: the pending record alone can't tell whether this is a
 			// same-save clear, only comparing against the persisted baseline can.
