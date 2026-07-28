@@ -1,7 +1,7 @@
 # Spike #2467 — Cross-instance stale-absolute-overwrite in the write-behind drain
 
 - **Spike issue:** [#2467](https://github.com/ginderjeremiah/GameServer/issues/2467)
-- **Status:** Research complete; direction decided and split into implementation sub-issues (see [Implementation issues](#implementation-issues)). The decisions below are the recommendation from this research, open to revision before the first sub-issue lands.
+- **Status:** Research complete; direction decided, split into implementation sub-issues, and **being implemented from #2492 onward** — see [Implementation issues](#implementation-issues) for what has shipped. Sections describing shipped behaviour document it rather than propose it.
 - **Predecessor:** [#2460](https://github.com/ginderjeremiah/GameServer/issues/2460) closed the *within-instance* half by remembering parked player lanes across drain passes (`_parkedPlayerLanes`).
 
 ## The hazard, restated precisely
@@ -158,22 +158,34 @@ exists to fix: two instances applying the same player's events concurrently both
 the data row — which can be the older event. The guard is therefore a **conditional** statement,
 
 ```sql
-UPDATE "PlayerWriteWatermark" SET "LastAppliedSequence" = @seq
-WHERE "PlayerId" = @p AND "Stream" = @s AND "TargetKey" = @k AND "LastAppliedSequence" <= @seq
+INSERT INTO "PlayerWriteWatermarks" ("PlayerId", "Stream", "TargetKey", "LastAppliedSequence")
+SELECT @p, @s, key, @seq FROM unnest(@keys) AS key ORDER BY key
+ON CONFLICT ("PlayerId", "Stream", "TargetKey") DO UPDATE
+  SET "LastAppliedSequence" = EXCLUDED."LastAppliedSequence"
+  WHERE "PlayerWriteWatermarks"."LastAppliedSequence" <= EXCLUDED."LastAppliedSequence"
+RETURNING "TargetKey"
 ```
 
-taking the row lock first, with the data write applied only when it reports rows-affected > 0, and both in
-one transaction. A missing watermark row is an insert-if-missing seeded at `@seq` before the conditional
-update (or an `INSERT … ON CONFLICT DO UPDATE … WHERE`), so a first-ever write for a target isn't rejected.
+One statement per event covering all of that event's keys, taking the row locks first, with the data write
+applied only to the targets it `RETURNING`s and both in the same transaction. A fresh insert returns its key
+regardless of the `WHERE`, which only gates the conflict branch, so a first-ever write for a target is never
+rejected. The `ORDER BY` puts the deterministic lock order into the statement itself.
+
+A separate seed-if-missing followed by a plain `UPDATE … WHERE "LastAppliedSequence" <= @seq` expresses the
+same predicate and is the clearer illustration of it, but it is two statements with a race the single one
+doesn't have — two instances can both find the row missing and both attempt the seed insert, so it needs its
+own violation handling. Shipped took the `ON CONFLICT` form (`PlayerWriteWatermarkGuard`).
 
 **The predicate is `<=`, not `<` — and note the operands are reversed from the rule in §1.** That rule is
 stated on the *event's* sequence (reject when `eventSeq < watermark`); the SQL is stated on the *column*
 (accept when `watermark <= eventSeq`). Both say the same thing, and getting this frame shift wrong is
 exactly the slip this paragraph exists to prevent. Under `<` the statement would apply only when the
-watermark is *strictly* below the event, rejecting equal sequences, which breaks two things: same-save
-siblings landing on one target would have the first advance the row and the second silently skipped, and
-the insert-if-missing seed would have no working value — seeded at `@seq`, the conditional update that
-follows would immediately no-op. Either is independently sufficient. The cost of `<=` is that an exact
+watermark is *strictly* below the event, rejecting equal sequences. That breaks same-save siblings landing
+on one target: the first advances the row, the second finds `@seq < @seq` false and is silently skipped.
+(Under the two-statement form it also leaves the seed with no working value — seeded at `@seq`, the
+conditional update that follows immediately no-ops. That argument does *not* carry over to the shipped
+`ON CONFLICT` shape, where a fresh insert returns its key regardless of the `WHERE`, so the same-save-sibling
+reason is the one carrying this for the code that actually exists.) The cost of `<=` is that an exact
 duplicate re-applies rather than being skipped, paying one redundant no-op write; that is the correct trade
 under the queue's at-least-once contract and is the same choice §1 already made, so don't "optimize" it back
 to `<`. (Sequence 0 never reaches this predicate at all — see the sentinel rule in §1.)
@@ -214,8 +226,21 @@ statistic Y landed first. Progress events carry only a save's *dirty* rows, so a
 silently drop live writes on the game's highest-volume path.
 
 `Stream` is a small enum (one per guarded handler); `TargetKey` is the canonical identity of the write
-target within that stream (`""` for the genuinely player-scoped streams, `"42"` for a `(player, item)`
-target, `"7:19"` for a `(statisticType, entityId)` pair). Chosen over **per-row version columns** on the
+target within that stream (`""` for the genuinely player-scoped streams, `"7:19"` for a
+`(statisticType, entityId)` pair).
+
+**Where a stream carries more than one *kind* of target, the key must be qualified by kind** — `"i:42"` for
+an item, `"s:3"` for a slot. The watermark row's identity is `(PlayerId, Stream, TargetKey)`, and the
+equipment stream keys on both an item and a slot (below), so bare ids would make **item 3 and slot 3 the
+same row**. Slot ids are small and dense and item ids start low, so that overlap is most of the low id
+range, not a corner case. Two things would break, both the failure this section rejects a per-player
+watermark over: the dual-key check would silently collapse to a single key whenever `ItemId == SlotId` (the
+guard de-duplicates its key set, since `ON CONFLICT DO UPDATE` cannot affect one row twice in a statement),
+and equipping item 3 would advance the watermark that also guards slot 3, so a reordered older event
+targeting slot 3 would be rejected against a sequence set by a write to a different, still-current target.
+An ordinal sort over prefixed keys is still a total order, so the deterministic lock order is unaffected.
+
+Chosen over **per-row version columns** on the
 six-plus affected tables because:
 
 - **It survives tombstones.** `ModRemovedHandler` deletes the row outright, so a per-row column takes the
@@ -288,9 +313,34 @@ preserves ordering cheaply within a pass and avoids doing work only to reject it
 
 ## Producer-counter seeding, and the one residual gap
 
-The counter is persisted in each aggregate's cached representation (`PlayerCacheModel`; a reserved field in
-the progress hash), so it survives reconnects and instance migration — the cases that matter. On a **cold
-DB load** (cache miss) it is seeded from the player's highest `LastAppliedSequence`.
+The counter is persisted in each aggregate's cached representation (`PlayerCacheModel`; a reserved `_seq`
+field in the progress hash), so it survives reconnects and instance migration. On a **cold DB load** (cache
+miss) it is seeded from the player's highest `LastAppliedSequence`.
+
+**Seed on the *value*, not the source: whenever a hydrated counter reads `Unsequenced`, seed it from the
+aggregate's persisted watermark `MAX`.** There are three ways a counter arrives at 0, not one, and only a
+value-based rule covers all of them:
+
+1. A **cold DB load** — no column backs the counter, so the projection can't supply it.
+2. A **cache miss** that falls through to the same load.
+3. A **cache hit on a blob a pre-upgrade instance wrote.** The player blob is re-serialized in full on every
+   save, so a pre-upgrade save erases `writeSequence` outright; the next upgraded read hydrates 0.
+
+The third is the one that is easy to miss, because it is a *hit*, and it lands squarely inside the
+rolling-deploy window §1's sentinel is about: P's saves reach 47 on an upgraded instance, P reconnects
+mid-deploy onto a pre-upgrade instance whose (correctly sentinel-applied) saves leave a blob with no
+counter, P reconnects onto an upgraded instance and hydrates 0. §1 closes the *envelope* direction of that
+story; the cache is what reopens the other end, so the two halves only meet if the seed is value-based.
+
+**`PlayerProgress` is genuinely safer here, and the reason is blob-vs-hash rather than anything about the
+aggregates.** Its counter is a reserved field in a Redis *hash*, and a pre-upgrade save `HSET`s only its
+dirty row fields, leaving `_seq` untouched. The counter freezes rather than resets — safe, since a resumed
+counter is ≥ every watermark it will meet. The player blob has no such protection because it is one value
+rewritten whole.
+
+A corollary for the implementation: `PlayerCacheModel.WriteSequence` must stay **non-`required`**. `required`
+is enforced at deserialization, so marking it would throw on exactly the pre-upgrade blobs it needs to
+tolerate — worse than reseeding. The guard is the value check, not the schema.
 
 **That `MAX` is scoped to the streams the aggregate itself produces**, not an unscoped per-player maximum:
 `Player` seeds from `PlayerCore` plus the equipment/mod streams, `PlayerProgress` from `Progress`. The two
