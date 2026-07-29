@@ -2,7 +2,7 @@
 
 - **Spike issue:** [#2467](https://github.com/ginderjeremiah/GameServer/issues/2467)
 - **Status:** Research complete; direction decided, split into implementation sub-issues, and **being implemented from #2492 onward** — see [Implementation issues](#implementation-issues) for what has shipped. Sections describing shipped behaviour document it rather than propose it.
-- **Predecessor:** [#2460](https://github.com/ginderjeremiah/GameServer/issues/2460) closed the *within-instance* half by remembering parked player lanes across drain passes (`_parkedPlayerLanes`).
+- **Predecessor:** [#2460](https://github.com/ginderjeremiah/GameServer/issues/2460) closed the *within-instance* half by remembering parked player lanes across drain passes (`_parkedPlayerLanes`). That deferral has since been retired (#2510) — the guard subsumes it.
 
 ## The hazard, restated precisely
 
@@ -37,7 +37,7 @@ insert-if-missing ones. Everything else writes absolute state and can regress:
 | `LogPreferenceChangedHandler` | absolute `Enabled` per log type | **Yes** |
 | `AttributeAllocationsChangedHandler` | absolute `Amount` per attribute | **Yes** |
 | `ItemFavoriteChangedHandler` | absolute `Favorite` | **Yes** |
-| `ModAppliedHandler` | delete-then-insert per `(player, item, slot)` | **Yes** |
+| `ModAppliedHandler` | load-then-upsert per `(player, item, slot)` | **Yes** |
 | `ModRemovedHandler` | `ExecuteDelete` per `(player, item, slot)` | **Yes** |
 | `LessonReadHandler` | absolute `ReadAt` | **Yes** |
 
@@ -204,11 +204,13 @@ which self-commits *outside* EF's implicit `SaveChanges` transaction — so even
 Left in separate commits, a crash between the watermark advance and the data write would advance the
 watermark without the data, and the redelivered event would then be **rejected as stale — a silently lost
 write, strictly worse than the bug being fixed**. So every guarded handler needs an explicit transaction
-(or a single-statement CTE doing both). Two knock-on effects for #2474: the existing bespoke
-unique-violation retries can no longer just `ChangeTracker.Clear()` and re-run, because a `DbUpdateException`
-aborts the surrounding transaction — they must roll back and restart it; and `ItemEquippedHandler`'s
-documented vacate/place crash window closes as a side effect, which is an improvement but invalidates the
-reasoning in its current comment.
+(or a single-statement CTE doing both). Two knock-on effects fell out of that, both since shipped: the
+handlers' bespoke unique-violation retries could no longer just `ChangeTracker.Clear()` and re-run, since a
+`DbUpdateException` aborts the surrounding transaction — and the resolution was to **delete** them rather
+than restart them, moving the single retry into the guard, which re-runs the whole attempt with the
+watermark advance included; and `ItemEquippedHandler`'s documented vacate/place crash window closed as a
+side effect, since both writes now sit in the guard's transaction, so the slot is never observably empty
+between them.
 
 This is the price of one guard mechanism instead of two. Per-row version columns would let the
 single-row handlers do it in one atomic conditional statement with no transaction at all — but they don't
@@ -243,10 +245,10 @@ both of them the failure this section rejects a per-player watermark over: the d
 silently collapse to a single key whenever `ItemId == SlotId` (the guard de-duplicates its key set, since
 `ON CONFLICT DO UPDATE` cannot affect one row twice in a statement), and equipping item 3 would advance
 the watermark that also guards slot 3, so a reordered older event targeting slot 3 would be rejected
-against a sequence set by a write to a different, still-current target. An ordinal sort over prefixed keys
-is still a total order, so the deterministic lock order is unaffected. The shipped `Progress` stream
-already follows this — `"stat:{typeId}:{entityId}"`, `"challenge:{id}"`, `"prof:{id}"` — for the same
-reason, since it too carries three kinds of target in one stream.
+against a sequence set by a write to a different, still-current target. Prefixing costs nothing here: any
+total order over the keys prevents the deadlock, and the statement's own `ORDER BY` is what supplies it.
+The shipped `Progress` stream already follows this — `"stat:{typeId}:{entityId}"`, `"challenge:{id}"`,
+`"prof:{id}"` — for the same reason, since it too carries three kinds of target in one stream.
 
 Chosen over **per-row version columns** on the six-plus affected tables because:
 
@@ -288,8 +290,8 @@ The surrounding transaction gives this for free, but it is too load-bearing to l
 still be **disposed of as §3 requires** — rolled back and acknowledged as a no-op, not signalled by an
 exception, which would escape the handler and dead-letter an ordinary reordering. The other cost is two
 watermark rows locked per equip, which needs a deterministic lock order or two concurrent equips deadlock
-against each other; the shipped guard supplies that generically (the upsert's own `ORDER BY` over the
-ordinal-sorted key set), so no per-handler ordering rule is needed.
+against each other; the shipped guard supplies that generically, in the upsert's own `ORDER BY` — not in
+the C# sort, which only makes the parameter array deterministic — so no per-handler ordering rule is needed.
 
 ### 3. How a stale event is disposed of — acknowledged, counted, and surfaced
 
@@ -313,13 +315,13 @@ watermark, have to compare against the batch's highest sequence. Under per-targe
 designs are orthogonal: each event in the batch compares against its own targets with its own sequence, in
 whatever order the batch applies them. Landing this spike's work first makes #1739 simpler, not harder.
 
-### 6. #2460's deferral can be dropped once the guard lands
+### 6. #2460's deferral can be dropped once the guard lands (done — #2510)
 
-`_parkedPlayerLanes` exists solely to stop a newer event applying ahead of a parked older one. Once the
-guard makes that harmless — the reclaimed older event is simply rejected — the deferral is pure convergence
-latency for the affected player with no correctness value, and should be removed in the same change rather
-than leaving two mechanisms guarding one invariant. The **pass-scoped** `playerLanes` map stays: it still
-preserves ordering cheaply within a pass and avoids doing work only to reject it.
+`_parkedPlayerLanes` existed solely to stop a newer event applying ahead of a parked older one. Once the
+guard made that harmless — the reclaimed older event is simply rejected — the deferral was pure convergence
+latency for the affected player with no correctness value, so it was removed rather than left as a second
+mechanism guarding one invariant. The **pass-scoped** `playerLanes` map stays: it still preserves ordering
+cheaply within a pass and avoids doing work only to reject it.
 
 ## Producer-counter seeding, and the one residual gap
 
@@ -396,11 +398,22 @@ consumed the stamp, so a cold load reseeding from 0 was harmless. #2494 removed 
 lapsed reseeds at 0, stamps 1, and has **every** guarded write rejected against their own previous
 high-water mark until the counter climbs back past it.
 
-Only the whole-state streams self-heal: `PlayerCore`, `SelectedSkills` and `AttributeAllocations` each
-carry the player's complete current state, so the first save past the old high-water mark repairs the row.
-The per-target streams do not — `Progress`, `Equipment`, `Mods`, `LogPreference`, `ItemFavorite` and
-`LessonRead` all carry only what one save touched, so a statistic, challenge completion, equip, mod, or
-preference changed **only** inside the rejected window is never re-written and stays wrong permanently.
+Whether a stream recovers turns on **two** questions, not one, and only `PlayerCore` answers both.
+
+- *Does the next event carry enough to repair the row?* Only the whole-state streams do — `PlayerCore`,
+  `SelectedSkills` and `AttributeAllocations` each carry the player's complete current state. The
+  per-target streams (`Progress`, `Equipment`, `Mods`, `LogPreference`, `ItemFavorite`, `LessonRead`)
+  carry only what one save touched, so they could never repair a row they don't mention.
+- *Does a next event actually arrive?* Only `PlayerCore` gets one from ordinary play — `RaiseCoreUpdated()`
+  rides zone changes, the boss-mode toggle and every battle-end exp/level write. `SelectedSkillsChanged`
+  and `AttributeAllocationsChanged` are raised **solely** by their own mutation, and since #2485 the
+  allocation event is deliberately not raised on an accepted-but-unchanged payload. A player who
+  re-allocated or changed loadout inside the rejected window and never does so again waits forever.
+
+So `PlayerCore` genuinely self-heals, and **everything else is permanent until the player happens to
+rewrite that exact target** — for the two whole-state stragglers that means the next allocation or loadout
+change, which may never come. Carrying complete state is what makes repair *possible*; riding ordinary play
+is what makes it *happen*.
 
 The lesson worth carrying: that deferral was recorded only in two code comments and in neither this table
 nor #2474's body, which is precisely why it survived into a shipped guard. A deferral that crosses an issue
