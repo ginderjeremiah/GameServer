@@ -1,24 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushSync } from 'svelte';
 import { statify } from '$lib/common';
+import { stubEngineWindow } from './engine-window-stub';
 
 // RenderEngine reads the shared logical clock; the real module pulls in the whole engine graph.
 const logicEngineStub = vi.hoisted(() => ({ time: 0 }));
 vi.mock('$lib/engine/engine', () => ({ logicEngine: logicEngineStub }));
 
-const rafCallbacks: (() => void)[] = [];
-// Monotonic, not `rafCallbacks.length`: the tests `shift()` callbacks off the front, which would hand
-// out the same handle twice (matching `render-engine.test.ts`, the other rAF stub).
-let rafHandleCounter = 0;
-vi.stubGlobal('window', {
-	requestAnimationFrame: vi.fn((cb: () => void) => {
-		rafCallbacks.push(cb);
-		return ++rafHandleCounter;
-	}),
-	cancelAnimationFrame: vi.fn(),
-	setInterval: (...args: Parameters<typeof setInterval>) => globalThis.setInterval(...args),
-	clearInterval: (...args: Parameters<typeof clearInterval>) => globalThis.clearInterval(...args)
-});
+const { rafCallbacks, reset: resetEngineWindow } = stubEngineWindow();
 
 import { LogicalEngine, tickSize } from '$lib/engine/logical-engine';
 import { RenderEngine } from '$lib/engine/render-engine';
@@ -98,8 +87,7 @@ describe('engine internals under statify (#2123)', () => {
 		let performanceNow: number;
 
 		beforeEach(() => {
-			rafCallbacks.length = 0;
-			rafHandleCounter = 0;
+			resetEngineWindow();
 			logicEngineStub.time = 0;
 			performanceNow = 0;
 			vi.spyOn(performance, 'now').mockImplementation(() => performanceNow);

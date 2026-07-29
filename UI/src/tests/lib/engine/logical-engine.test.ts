@@ -1,15 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { stubEngineWindow } from './engine-window-stub';
 
 vi.mock('svelte', async (importOriginal) => ({
 	...((await importOriginal()) as Record<string, unknown>),
 	onDestroy: vi.fn()
 }));
 
-vi.stubGlobal('window', {
-	setInterval: (...args: Parameters<typeof setInterval>) => globalThis.setInterval(...args),
-	clearInterval: (...args: Parameters<typeof clearInterval>) => globalThis.clearInterval(...args),
-	requestAnimationFrame: vi.fn()
-});
+stubEngineWindow();
 
 import { LogicalEngine, onLogicalUpdate, onIdleTimeLost, tickSize } from '$lib/engine/logical-engine';
 

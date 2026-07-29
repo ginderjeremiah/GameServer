@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { stubEngineWindow } from './engine-window-stub';
 
 vi.mock('svelte', async (importOriginal) => ({
 	...((await importOriginal()) as Record<string, unknown>),
@@ -8,18 +9,7 @@ vi.mock('svelte', async (importOriginal) => ({
 const logicEngineStub = vi.hoisted(() => ({ time: 0 }));
 vi.mock('$lib/engine/engine', () => ({ logicEngine: logicEngineStub }));
 
-const rafCallbacks: (() => void)[] = [];
-const cancelledHandles: number[] = [];
-let rafHandleCounter = 0;
-vi.stubGlobal('window', {
-	requestAnimationFrame: vi.fn((cb: () => void) => {
-		rafCallbacks.push(cb);
-		return ++rafHandleCounter;
-	}),
-	cancelAnimationFrame: vi.fn((handle: number) => {
-		cancelledHandles.push(handle);
-	})
-});
+const { rafCallbacks, cancelledHandles, reset: resetEngineWindow } = stubEngineWindow();
 
 import { RenderEngine, onRenderUpdate } from '$lib/engine/render-engine';
 
@@ -31,9 +21,7 @@ describe('RenderEngine', () => {
 	let unhook: () => void;
 
 	beforeEach(() => {
-		rafCallbacks.length = 0;
-		cancelledHandles.length = 0;
-		rafHandleCounter = 0;
+		resetEngineWindow();
 		logicEngineStub.time = 0;
 		performanceNow = 0;
 		renderUpdates = [];
