@@ -298,5 +298,33 @@ describe('zoneEntity', () => {
 			const z = { ...zoneEntity.newItem(1), isHome: true };
 			expect(identityWarn?.(z)).toBeNull();
 		});
+
+		describe('encounter levels (#2518, backend-enforced)', () => {
+			// Mirrors AdminZonesIntegrationTests.SaveZones_OutOfRangeLevels_ReturnsFailure — the same four
+			// rules the Zone domain model throws on when the zone snapshot rebuilds.
+			it.each([
+				[{ levelMin: 0 }, 'Level Min must be at least 1'],
+				[{ levelMin: -3 }, 'Level Min must be at least 1'],
+				[{ levelMax: 0 }, 'Level Max must be at least 1'],
+				[{ levelMin: 8, levelMax: 4 }, 'Level Min cannot be greater than Level Max'],
+				[{ bossLevel: 0 }, 'Boss Level must be at least 1']
+			])('blocks Save on %o', (over, message) => {
+				const z = { ...zoneEntity.newItem(1), ...over };
+				expect(identityWarn?.(z)).toEqual({ message, blocking: true });
+			});
+
+			it('passes the boundary: level 1 and an equal min/max pair', () => {
+				const z = { ...zoneEntity.newItem(1), levelMin: 1, levelMax: 1, bossLevel: 1 };
+				expect(identityWarn?.(z)).toBeNull();
+			});
+
+			it('flags a bad level ahead of the boss warning, since the form shows the levels first', () => {
+				const enemies: unknown[] = [];
+				enemies[7] = { id: 7, name: 'Warden', isBoss: false };
+				staticData.enemies = enemies;
+				const z = { ...zoneEntity.newItem(1), levelMin: 0, bossEnemyId: 7 };
+				expect(identityWarn?.(z)).toEqual({ message: 'Level Min must be at least 1', blocking: true });
+			});
+		});
 	});
 });

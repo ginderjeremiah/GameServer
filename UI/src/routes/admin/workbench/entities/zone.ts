@@ -1,9 +1,10 @@
 import { ApiRequest, fetchSocketData, type IZone, type IZoneEnemy } from '$lib/api';
+import { MIN_ZONE_LEVEL } from '$lib/api/types/game-constants';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import { childChanged, guardedSave, persistEntity } from '../save-helpers';
 import { firstFree } from './helpers';
-import type { EntityConfig } from './types';
+import type { EntityConfig, Warning } from './types';
 
 /** A zone plus its spawn table, derived from the enemies' embedded spawn lists. */
 export interface WorkbenchZone extends IZone {
@@ -17,6 +18,41 @@ export interface WorkbenchZone extends IZone {
  * agree.
  */
 const isLiveEnemy = (enemyId: number): boolean => !staticData.enemies?.[enemyId]?.retiredAt;
+
+/**
+ * Out-of-range encounter levels, blocking. `NumInput` accepts any number, and the levels are copied
+ * to the column unchecked, but the `Zone` domain model throws on them when the zone snapshot next
+ * rebuilds — a committed typo would fail every subsequent cache reload (and boot) with the bad row
+ * already durable. `AdminZones.SaveZones` hard-rejects the same rules, so preempt it here (#2518).
+ */
+const levelWarn = (z: WorkbenchZone): Warning | null => {
+	if (z.levelMin < MIN_ZONE_LEVEL) {
+		return { message: `Level Min must be at least ${MIN_ZONE_LEVEL}`, blocking: true };
+	}
+	if (z.levelMax < MIN_ZONE_LEVEL) {
+		return { message: `Level Max must be at least ${MIN_ZONE_LEVEL}`, blocking: true };
+	}
+	if (z.levelMin > z.levelMax) {
+		return { message: 'Level Min cannot be greater than Level Max', blocking: true };
+	}
+	// Checked whether or not a boss is authored: the domain model requires a valid boss level regardless.
+	if (z.bossLevel < MIN_ZONE_LEVEL) {
+		return { message: `Boss Level must be at least ${MIN_ZONE_LEVEL}`, blocking: true };
+	}
+	return null;
+};
+
+/** A dedicated boss that has lost its boss flag, or one on the no-combat Home zone — both blocking. */
+const bossWarn = (z: WorkbenchZone): Warning | null => {
+	if (z.bossEnemyId == null || z.bossEnemyId < 0) {
+		return null;
+	}
+	if (z.isHome) {
+		return { message: 'The Home zone cannot have a boss', blocking: true };
+	}
+	const boss = staticData.enemies?.[z.bossEnemyId];
+	return boss && !boss.isBoss ? { message: 'Dedicated boss is no longer flagged as a boss', blocking: true } : null;
+};
 
 const refresh = async (): Promise<WorkbenchZone[]> => {
 	const [zones, enemies] = await Promise.all([fetchSocketData('GetZones'), fetchSocketData('GetEnemies')]);
@@ -83,19 +119,9 @@ export const zoneEntity: EntityConfig<WorkbenchZone> = {
 			// boss flag (reference.bossEnemyOptions' `keep` exception); flag that drift here
 			// since the zone would otherwise silently point at a non-boss enemy. Hard-rejected
 			// by AdminZones.SaveZones, so it blocks Save (#2217). A boss on a Home zone is
-			// likewise hard-rejected there (Home is a no-combat sanctuary) — flag it too.
-			warn: (z) => {
-				if (z.bossEnemyId == null || z.bossEnemyId < 0) {
-					return null;
-				}
-				if (z.isHome) {
-					return { message: 'The Home zone cannot have a boss', blocking: true };
-				}
-				const boss = staticData.enemies?.[z.bossEnemyId];
-				return boss && !boss.isBoss
-					? { message: 'Dedicated boss is no longer flagged as a boss', blocking: true }
-					: null;
-			},
+			// likewise hard-rejected there (Home is a no-combat sanctuary) — flag it too, as are
+			// out-of-range encounter levels (#2518).
+			warn: (z) => levelWarn(z) ?? bossWarn(z),
 			fields: [
 				{
 					key: 'name',

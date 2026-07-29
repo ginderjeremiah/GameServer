@@ -470,11 +470,144 @@ namespace Game.Application.Tests.DataAccess
             }
         }
 
+        [Theory]
+        [InlineData(0, 10, 1, "Level Min must be at least 1.")]
+        [InlineData(-3, 10, 1, "Level Min must be at least 1.")]
+        [InlineData(1, 0, 1, "Level Max must be at least 1.")]
+        [InlineData(8, 4, 1, "Level Min cannot be greater than Level Max.")]
+        [InlineData(1, 10, 0, "Boss Level must be at least 1.")]
+        public void SaveZones_OutOfRangeLevels_ReturnsFailure(int levelMin, int levelMax, int bossLevel, string expectedMessage)
+        {
+            // Every one of these commits cleanly but throws inside the Zone domain model when the zone
+            // snapshot next rebuilds, permanently poisoning every instance's reload (and boot) with the bad
+            // row already durable. The boss level is guarded with no boss authored, since the domain model
+            // requires it regardless.
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminZones>();
+
+            var result = admin.SaveZones(
+            [
+                new Change<Contracts.Zone>
+                {
+                    ChangeType = EChangeType.Add,
+                    Item = new Contracts.Zone
+                    {
+                        Name = "Mistyped",
+                        Description = "",
+                        DesignerNotes = "",
+                        LevelMin = levelMin,
+                        LevelMax = levelMax,
+                        BossLevel = bossLevel,
+                    },
+                },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(expectedMessage, result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveZones_OutOfRangeLevels_RejectsBeforeStagingTheRestOfTheBatch()
+        {
+            // The guard runs in the up-front pre-pass, so a bad zone anywhere in the batch rejects the whole
+            // save — otherwise the commit filter would persist the accepted siblings around it.
+            using (var scope = CreateScope())
+            {
+                var admin = scope.ServiceProvider.GetRequiredService<IAdminZones>();
+
+                var result = admin.SaveZones(
+                [
+                    new Change<Contracts.Zone>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = new Contracts.Zone
+                        {
+                            Name = "Valid Sibling",
+                            Description = "",
+                            DesignerNotes = "",
+                            LevelMin = 1,
+                            LevelMax = 10,
+                            BossLevel = 1,
+                        },
+                    },
+                    new Change<Contracts.Zone>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = new Contracts.Zone
+                        {
+                            Name = "Mistyped",
+                            Description = "",
+                            DesignerNotes = "",
+                            LevelMin = 0,
+                            LevelMax = 10,
+                            BossLevel = 1,
+                        },
+                    },
+                ]);
+
+                Assert.False(result.Succeeded);
+                Assert.Equal("Level Min must be at least 1.", result.ErrorMessage);
+                await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                Assert.False(await context.Set<Entities.Zone>()
+                    .AnyAsync(z => z.Name == "Valid Sibling" || z.Name == "Mistyped", CancellationToken));
+            }
+        }
+
+        [Fact]
+        public async Task SaveZones_BoundaryLevels_Succeeds()
+        {
+            // Level 1 and an equal min/max pair are both valid single-level authoring, so the guard must not
+            // over-reject the boundary it enforces.
+            using (var writeScope = CreateScope())
+            {
+                var admin = writeScope.ServiceProvider.GetRequiredService<IAdminZones>();
+
+                var result = admin.SaveZones(
+                [
+                    new Change<Contracts.Zone>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = new Contracts.Zone
+                        {
+                            Name = "Threshold",
+                            Description = "",
+                            DesignerNotes = "",
+                            LevelMin = 1,
+                            LevelMax = 1,
+                            BossLevel = 1,
+                        },
+                    },
+                ]);
+
+                Assert.True(result.Succeeded);
+                await writeScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                var zone = await context.Set<Entities.Zone>()
+                    .SingleAsync(z => z.Name == "Threshold", CancellationToken);
+                Assert.Equal(1, zone.LevelMin);
+                Assert.Equal(1, zone.LevelMax);
+            }
+
+            // The whole point of the guard: what it accepts must survive the domain mapping the snapshot
+            // rebuild performs, which throws (failing this test) on a row the guard let through wrongly.
+            await ReloadReferenceCachesAsync();
+        }
+
         [Fact]
         public void SaveZones_EditUnknownZone_ReturnsNotFound()
         {
-            // An Edit of a non-existent zone (no boss/unlock references, so the FK pre-pass passes) must be
-            // rejected by the processor's shared edit-existence guard rather than reaching a 0-row UPDATE.
+            // An Edit of a non-existent zone (no boss/unlock references and in-range levels, so the whole
+            // pre-pass passes) must be rejected by the processor's shared edit-existence guard rather than
+            // reaching a 0-row UPDATE.
             using var scope = CreateScope();
             var admin = scope.ServiceProvider.GetRequiredService<IAdminZones>();
 
@@ -483,7 +616,16 @@ namespace Game.Application.Tests.DataAccess
                 new Change<Contracts.Zone>
                 {
                     ChangeType = EChangeType.Edit,
-                    Item = new Contracts.Zone { Id = 99999, Name = "Ghost", Description = "", DesignerNotes = "" },
+                    Item = new Contracts.Zone
+                    {
+                        Id = 99999,
+                        Name = "Ghost",
+                        Description = "",
+                        DesignerNotes = "",
+                        LevelMin = 1,
+                        LevelMax = 10,
+                        BossLevel = 1,
+                    },
                 },
             ]);
 

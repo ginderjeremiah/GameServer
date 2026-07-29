@@ -264,7 +264,11 @@ namespace Game.Api.Tests.Integration
                         DesignerNotes = "",
                         Order = 5,
                         LevelMin = 10,
-                        LevelMax = 20
+                        LevelMax = 20,
+                        // Sent explicitly even with no boss authored: the level guard requires it >= 1, and
+                        // an omitted BossLevel only survived before because EF's store default (1) masked
+                        // the unset 0 on an Add — an Edit would have written the 0 through (#2518).
+                        BossLevel = 1
                     },
                     ChangeType = 0 // Add
                 }
@@ -2189,7 +2193,8 @@ namespace Game.Api.Tests.Integration
                         DesignerNotes = "",
                         Order = 0,
                         LevelMin = 1,
-                        LevelMax = 5
+                        LevelMax = 5,
+                        BossLevel = 1
                     },
                     ChangeType = 0 // Add
                 },
@@ -2203,7 +2208,9 @@ namespace Game.Api.Tests.Integration
                         DesignerNotes = "",
                         Order = 0,
                         LevelMin = 1,
-                        LevelMax = 5
+                        LevelMax = 5,
+                        // In-range levels so the pre-pass passes and the edit-existence guard is what rejects.
+                        BossLevel = 1
                     },
                     ChangeType = 1 // Edit
                 }
@@ -2216,6 +2223,80 @@ namespace Game.Api.Tests.Integration
             Assert.NotNull(result);
             Assert.Equal("Zone not found.", result.ErrorMessage);
             Assert.DoesNotContain(GetZones(), z => z.Name == "Ghost Zone");
+        }
+
+        [Fact]
+        public async Task AddEditZones_InvertedLevelRange_ReturnsErrorAndPersistsNothing()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // An inverted level range commits cleanly but throws inside the Zone domain model when the zone
+            // snapshot rebuilds, so every later reload (and boot) fails with the bad row already durable.
+            // It must reject as a graceful 400 instead, persisting nothing (#2518).
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Inverted Range",
+                        Description = "Should never be saved",
+                        DesignerNotes = "",
+                        Order = 0,
+                        LevelMin = 20,
+                        LevelMax = 5,
+                        BossLevel = 1
+                    },
+                    ChangeType = 0 // Add
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditZones", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Level Min cannot be greater than Level Max.", result.ErrorMessage);
+            Assert.DoesNotContain(GetZones(), z => z.Name == "Inverted Range");
+        }
+
+        [Fact]
+        public async Task AddEditZones_EditToZeroBossLevel_ReturnsErrorAndLeavesTheZoneIntact()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            var existing = GetZones().First(z => z.RetiredAt is null);
+
+            // The Edit path is where a zero boss level would actually reach the column: EF's store default
+            // (1) masks an unset BossLevel on an Add, but an Edit tracks the entity Modified and writes every
+            // property through — so the guard, not the default, is what keeps the snapshot buildable (#2518).
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        existing.Id,
+                        existing.Name,
+                        existing.Description,
+                        DesignerNotes = existing.DesignerNotes ?? "",
+                        existing.Order,
+                        existing.LevelMin,
+                        existing.LevelMax,
+                        BossLevel = 0
+                    },
+                    ChangeType = 1 // Edit
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditZones", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal("Boss Level must be at least 1.", result.ErrorMessage);
+            Assert.Equal(existing.BossLevel, GetZones().Single(z => z.Id == existing.Id).BossLevel);
         }
 
         [Fact]

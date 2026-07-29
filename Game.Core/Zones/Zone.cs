@@ -22,7 +22,7 @@ namespace Game.Core.Zones
             get => _levelMin;
             init
             {
-                if (value < 1)
+                if (!ZoneLevelRules.IsValidLevel(value))
                 {
                     throw new ArgumentOutOfRangeException(nameof(LevelMin), value,
                         $"{nameof(LevelMin)} must be at least 1.");
@@ -40,7 +40,7 @@ namespace Game.Core.Zones
             get => _levelMax;
             init
             {
-                if (value < 1)
+                if (!ZoneLevelRules.IsValidLevel(value))
                 {
                     throw new ArgumentOutOfRangeException(nameof(LevelMax), value,
                         $"{nameof(LevelMax)} must be at least 1.");
@@ -63,7 +63,7 @@ namespace Game.Core.Zones
             get => _bossLevel;
             init
             {
-                if (value < 1)
+                if (!ZoneLevelRules.IsValidLevel(value))
                 {
                     throw new ArgumentOutOfRangeException(nameof(BossLevel), value,
                         $"{nameof(BossLevel)} must be at least 1.");
@@ -108,7 +108,7 @@ namespace Game.Core.Zones
         /// </summary>
         private void ValidateLevelRange()
         {
-            if (_levelMin > 0 && _levelMax > 0 && _levelMin > _levelMax)
+            if (_levelMin > 0 && _levelMax > 0 && !ZoneLevelRules.IsOrderedRange(_levelMin, _levelMax))
             {
                 throw new ArgumentException(
                     $"{nameof(LevelMin)} ({_levelMin}) cannot be greater than {nameof(LevelMax)} ({_levelMax}).",
