@@ -9,6 +9,7 @@ import {
 	fetchSocketData,
 	type ISkill
 } from '$lib/api';
+import { MIN_SKILL_COOLDOWN_MS } from '$lib/api/types/game-constants';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import {
@@ -70,6 +71,13 @@ export const skillEntity: EntityConfig<ISkill> = {
 			glyph: 'tag',
 			desc: 'Name, damage, cooldown & description',
 			kind: 'fields',
+			// A cooldown below one simulation tick makes the engine and the combat rating disagree about the
+			// skill (the engine can't fire faster than a tick; the rating prices the authored value, and at 0
+			// skips the skill as zero offense). Hard-rejected by AdminSkills.SaveSkills, so it blocks Save.
+			warn: (s) =>
+				s.cooldownMs < MIN_SKILL_COOLDOWN_MS
+					? { message: `Cooldown must be at least ${MIN_SKILL_COOLDOWN_MS}ms`, blocking: true }
+					: null,
 			fields: [
 				{
 					key: 'name',
