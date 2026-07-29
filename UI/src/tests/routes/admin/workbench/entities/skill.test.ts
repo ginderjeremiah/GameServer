@@ -340,18 +340,21 @@ describe('skillEntity', () => {
 		const withEffects = (effects: ISkill['effects']): ISkill => ({ ...skillEntity.newItem(1), effects });
 
 		// Driven off the generated accumulator table rather than an enumerated list, so a new DoT type is
-		// covered without remembering to widen this test.
-		it.each(dotAccumulators().map((a) => a.accumulator))(
-			'blocks Save for a Multiplicative effect on DoT accumulator %i (backend-enforced)',
-			(accumulator) => {
+		// covered without remembering to widen this test. The reverse-mapped enum name rides along so a
+		// failing case names the attribute rather than its raw id.
+		const accumulatorCases = dotAccumulators().map((a) => [EAttribute[a.accumulator], a.accumulator] as const);
+
+		it.each(accumulatorCases)(
+			'blocks Save for a Multiplicative effect on DoT accumulator %s (backend-enforced)',
+			(_name, accumulator) => {
 				const skill = withEffects([effect({ attributeId: accumulator, modifierTypeId: EModifierType.Multiplicative })]);
 				expect(effectsWarn?.(skill)).toEqual(blocking);
 			}
 		);
 
-		it.each(dotAccumulators().map((a) => a.accumulator))(
-			'passes for an Additive effect on DoT accumulator %i — the shape the engine and rating assume',
-			(accumulator) => {
+		it.each(accumulatorCases)(
+			'passes for an Additive effect on DoT accumulator %s — the shape the engine and rating assume',
+			(_name, accumulator) => {
 				const skill = withEffects([effect({ attributeId: accumulator, modifierTypeId: EModifierType.Additive })]);
 				expect(effectsWarn?.(skill)).toBeNull();
 			}

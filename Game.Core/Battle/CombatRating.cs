@@ -235,8 +235,8 @@ namespace Game.Core.Battle
                     // scaling attribute is read off the original battler, not effectiveCaster — mirroring
                     // FoldedEffectMagnitude's "the caster's ORIGINAL attribute" rule, so the two DoT-adjacent
                     // reads agree. Pricing the magnitude as a flat per-second rate needs no ModifierType check:
-                    // a Multiplicative DoT-accumulator effect is unauthorable (#2169), so every effect reaching
-                    // here is Additive.
+                    // a Multiplicative DoT-accumulator effect is unauthorable for a live skill (#2169; the
+                    // lint's retired-skill gap is tracked with #2537).
                     var magnitude = effect.Amount + battler.GetAttributeValue(effect.ScalingAttributeId) * effect.ScalingAmount;
                     var ampedMagnitude = effectiveCaster.AmplifyDamage(magnitude, dotType);
                     var durationSec = Math.Min(effect.DurationMs / 1000.0, ServerGameConstants.RefFightDuration / 2.0);

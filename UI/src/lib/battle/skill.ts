@@ -85,9 +85,10 @@ export class Skill implements ISkill {
 	 *  per-second accumulator, the caster's typed amplification is then frozen into the magnitude at apply
 	 *  time (#1320, Area C), so the accumulated DoT carries the caster's amplification while the defender's
 	 *  resistance is sampled live each tick. That freeze assumes an Additive modifier, which authoring
-	 *  enforces (#2169) rather than the engine special-casing it here. The optional `onApplied` callback — supplied only by the live
-	 *  engine, never the headless simulator — is invoked for every application (each one stacks) with the
-	 *  battler it landed on and the resolved amount, so the combat log can announce it. */
+	 *  enforces for a live skill (#2169; the retired-skill lint gap is tracked with #2537) rather than the
+	 *  engine special-casing it here. The optional `onApplied` callback — supplied only by the live engine,
+	 *  never the headless simulator — is invoked for every application (each one stacks) with the battler it
+	 *  landed on and the resolved amount, so the combat log can announce it. */
 	public applyEffects(opponent: Battler, onApplied?: (effect: ISkillEffect, target: Battler, amount: number) => void) {
 		for (const effect of this.effects) {
 			const target = effect.target === ESkillEffectTarget.Self ? this.owner : opponent;
