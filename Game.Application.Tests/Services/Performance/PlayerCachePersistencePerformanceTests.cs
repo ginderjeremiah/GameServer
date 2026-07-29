@@ -117,9 +117,8 @@ namespace Game.Application.Tests.Services.Performance
 
             var cls = await TestDataSeeder.CreateClassAsync(context);
             var zone = await TestDataSeeder.CreateZoneAsync(context);
-            // Username is varchar(20); a short random suffix keeps the two SeedPlayerAsync calls in a single
-            // test from colliding without approaching that limit.
-            var user = await TestDataSeeder.CreateUserAsync(context, username: $"perf{Guid.NewGuid():N}"[..20]);
+            // Unique so the two SeedPlayerAsync calls in a single test can't collide on IX_Users_Username.
+            var user = await TestDataSeeder.CreateUserAsync(context, username: TestDataSeeder.UniqueUsername("perf"));
             var player = await TestDataSeeder.CreatePlayerAsync(context, user.Id, zoneId: zone.Id, classId: cls.Id);
 
             var items = Enumerable.Range(0, itemCount)
