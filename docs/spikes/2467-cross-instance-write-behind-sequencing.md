@@ -2,7 +2,7 @@
 
 - **Spike issue:** [#2467](https://github.com/ginderjeremiah/GameServer/issues/2467)
 - **Status:** Research complete; direction decided, split into implementation sub-issues, and **being implemented from #2492 onward** — see [Implementation issues](#implementation-issues) for what has shipped. Sections describing shipped behaviour document it rather than propose it.
-- **Predecessor:** [#2460](https://github.com/ginderjeremiah/GameServer/issues/2460) closed the *within-instance* half by remembering parked player lanes across drain passes (`_parkedPlayerLanes`). That deferral has since been retired (#2510) — the guard subsumes it.
+- **Predecessor:** [#2460](https://github.com/ginderjeremiah/GameServer/issues/2460) closed the *within-instance* half by remembering parked player lanes across drain passes (`_parkedPlayerLanes`). That deferral has since been retired (#2475) — the guard subsumes it.
 
 ## The hazard, restated precisely
 
@@ -61,8 +61,8 @@ close the window the marker would have to be claimed at *reserve* time (a fleet-
 lock, atomic with the `LMOVE`), which reintroduces exactly the same-player cross-fleet serialization
 `#1701` set out to relax and still leaves the marker to leak on a crash. To be fair to the mechanism: a
 fleet-shared marker would still block every same-player event reserved *after* the park, which is most of a
-long outage — it narrows the window rather than doing nothing, and that matters for #2475, which retires the
-instance-local marker because the guard makes it redundant, not because it never protected anything.
+long outage — it narrows the window rather than doing nothing, and that mattered for #2475, which retired
+the instance-local marker because the guard makes it redundant, not because it never protected anything.
 **Sequencing is not merely the "obvious shape" — it is the only shape that is correct by construction**,
 because it makes the guard depend on the events' own relative age rather than on any instance observing
 another's state in time.
@@ -317,7 +317,7 @@ watermark, have to compare against the batch's highest sequence. Under per-targe
 designs are orthogonal: each event in the batch compares against its own targets with its own sequence, in
 whatever order the batch applies them. Landing this spike's work first makes #1739 simpler, not harder.
 
-### 6. #2460's deferral can be dropped once the guard lands (done — #2510)
+### 6. #2460's deferral can be dropped once the guard lands (done — #2475)
 
 `_parkedPlayerLanes` existed solely to stop a newer event applying ahead of a parked older one. Once the
 guard made that harmless — the reclaimed older event is simply rejected — the deferral was pure convergence
@@ -406,11 +406,17 @@ Whether a stream recovers turns on **two** questions, not one, and only `PlayerC
   `SelectedSkills` and `AttributeAllocations` each carry the player's complete current state. The
   per-target streams (`Progress`, `Equipment`, `Mods`, `LogPreference`, `ItemFavorite`, `LessonRead`)
   carry only what one save touched, so they could never repair a row they don't mention.
-- *Does a next event actually arrive?* Only `PlayerCore` gets one from ordinary play — `RaiseCoreUpdated()`
-  rides zone changes, the boss-mode toggle and every battle-end exp/level write. `SelectedSkillsChanged`
-  and `AttributeAllocationsChanged` are raised **solely** by their own mutation, and since #2485 the
-  allocation event is deliberately not raised on an accepted-but-unchanged payload. A player who
-  re-allocated or changed loadout inside the rejected window and never does so again waits forever.
+- *Does a next event actually arrive?* Of the whole-state streams, only `PlayerCore` gets one from ordinary
+  play — `RaiseCoreUpdated()` rides zone changes, the boss-mode toggle, exp grants, and `StampActivity`,
+  which fires on **every** battle completion including a loss that raises no other core update.
+  `SelectedSkillsChanged` and `AttributeAllocationsChanged` are raised **solely** by their own mutation, and
+  since #2485 the allocation event is deliberately not raised on an accepted-but-unchanged payload. A player
+  who re-allocated or changed loadout inside the rejected window and never does so again waits forever.
+
+`Progress` is the clean illustration that these really are two questions: it rides ordinary play as
+reliably as `PlayerCore` does — a `ProgressUpdatedEvent` is published on every progress save, and the
+battle-completion tick saves progress alongside the player — and it still cannot recover, because the
+events it sends carry only that save's dirty rows. Answering one question is not enough.
 
 So `PlayerCore` genuinely self-heals, and **everything else is permanent until the player happens to
 rewrite that exact target** — for the two whole-state stragglers that means the next allocation or loadout
