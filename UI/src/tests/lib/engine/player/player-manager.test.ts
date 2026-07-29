@@ -104,7 +104,10 @@ describe('PlayerManager', () => {
 			expect(manager.unlockedSkills).toEqual(data.unlockedSkills);
 			expect(manager.logPreferences).toEqual(data.logPreferences);
 			expect(manager.lessons).toEqual(data.lessons);
-			expect(manager.inventoryData).toEqual(data.inventoryData);
+			// `toBe`, not `toEqual`: the payload must be adopted wholesale, never merged in place. The derived
+			// InventoryManager skips its rebuild when the payload reference is unchanged (#2521), so an
+			// in-place merge here would stop it re-deriving on a real resync at all.
+			expect(manager.inventoryData).toBe(data.inventoryData);
 		});
 
 		it('derives selectedSkills as the equipped ids in loadout order', () => {

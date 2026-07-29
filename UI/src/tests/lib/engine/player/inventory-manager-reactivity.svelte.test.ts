@@ -8,9 +8,16 @@ import { makeItem as makeItemContract } from '../../../fixtures/items';
 // Aliased for the same reason: the local `makeItemMod` is an id-only adapter over the shared builder.
 import { makeItemMod as makeItemModContract } from '../../../fixtures/item-mods';
 
-const mockInventoryData: IInventoryData = {
+let mockInventoryData: IInventoryData = {
 	unlockedItems: [],
 	unlockedMods: []
+};
+
+/** Simulates a player load delivering a fresh inventory payload — a whole new object, as a parsed
+ *  `Auth/Status` response always is. That freshness is what makes the manager re-derive rather than skip
+ *  the rebuild (#2521), so a test exercising a second `initialize` must deliver through this. */
+const deliverInventoryData = (data: Partial<IInventoryData> = {}) => {
+	mockInventoryData = { unlockedItems: [], unlockedMods: [], ...data };
 };
 
 vi.mock('$lib/engine', () => ({
@@ -96,8 +103,7 @@ describe('InventoryManager reactivity under statify (#1957)', () => {
 		manager = statify(new InventoryManager());
 		mockItems.length = 0;
 		mockItemMods.length = 0;
-		mockInventoryData.unlockedItems = [];
-		mockInventoryData.unlockedMods = [];
+		deliverInventoryData();
 		mockSendSocketCommand.mockReset().mockResolvedValue({});
 	});
 
@@ -203,8 +209,6 @@ describe('InventoryManager reactivity under statify (#1957)', () => {
 	it('observes unlockedItems/unlockedMods changes through a resync (initialize called again)', () => {
 		mockItems[1] = makeItem(1);
 		mockItemMods[10] = makeItemMod(10);
-		mockInventoryData.unlockedItems = [];
-		mockInventoryData.unlockedMods = [];
 		manager.initialize();
 
 		let itemCount: number | undefined;
@@ -222,8 +226,7 @@ describe('InventoryManager reactivity under statify (#1957)', () => {
 		expect(modUnlocked).toBe(false);
 
 		// Simulate a resync delivering an item/mod that weren't present at the last initialize.
-		mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
-		mockInventoryData.unlockedMods = [10];
+		deliverInventoryData({ unlockedItems: [makeInventoryItem({ itemId: 1 })], unlockedMods: [10] });
 		manager.initialize();
 		flushSync();
 		expect(itemCount).toBe(1);

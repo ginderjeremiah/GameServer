@@ -26,6 +26,11 @@ class WithPrivateField {
 	}
 }
 
+class WithPayload {
+	count = 0;
+	payload: { id: number } = { id: 1 };
+}
+
 // Reads the `__statifyPerformed` idempotency marker the utility stamps on every processed object.
 const wasStatified = (obj: unknown) => (obj as { __statifyPerformed?: boolean }).__statifyPerformed === true;
 
@@ -58,6 +63,21 @@ describe('statify', () => {
 
 		expect(Object.keys(outer)).not.toContain('__statifyPerformed');
 		expect(JSON.stringify(outer)).not.toContain('__statifyPerformed');
+	});
+
+	it('reads back a plain-object field as a stable reference until it is reassigned', () => {
+		// A manager derived from another's plain-object payload keys "did a fresh payload arrive?" off that
+		// field's reference identity (`playerManager.inventoryData`, #2521), so repeated reads must not mint
+		// a new proxy each time — only a reassignment may change the reference.
+		const withPayload = statify(new WithPayload());
+		const first = withPayload.payload;
+
+		expect(withPayload.payload).toBe(first);
+		withPayload.count++;
+		expect(withPayload.payload).toBe(first);
+
+		withPayload.payload = { id: 2 };
+		expect(withPayload.payload).not.toBe(first);
 	});
 
 	it('recursively statifies nested class instances and array elements', () => {
