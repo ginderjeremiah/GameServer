@@ -34,6 +34,5 @@ namespace Game.Application.Tests.Services
 
             Assert.Equal(cts.Token, userLogins.LastSaveToken);
         }
-
     }
 }

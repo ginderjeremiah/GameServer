@@ -227,6 +227,5 @@ namespace Game.Application.Tests.DataAccess
                 return Task.CompletedTask;
             }
         }
-
     }
 }
