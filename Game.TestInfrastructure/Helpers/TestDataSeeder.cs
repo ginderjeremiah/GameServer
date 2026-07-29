@@ -22,10 +22,26 @@ namespace Game.TestInfrastructure.Helpers
             }));
 
         /// <summary>
+        /// The longest prefix <see cref="UniqueUsername"/> accepts, leaving at least 12 hex characters of GUID
+        /// inside the column's 20.
+        /// </summary>
+        private const int MaxUsernamePrefixLength = 8;
+
+        /// <summary>
         /// A username no other seeded user will collide with on <c>IX_Users_Username</c>, for a test that seeds
         /// several. Truncated because the column is <c>varchar(20)</c> — the reason this isn't just a raw GUID.
         /// </summary>
-        public static string UniqueUsername(string prefix = "test") => $"{prefix}{Guid.NewGuid():N}"[..20];
+        /// <param name="prefix">
+        /// A short label identifying the seeding suite. Bounded because the truncation cuts the <em>tail</em>,
+        /// which is where all the entropy lives: an over-long prefix would return the same constant every call
+        /// and collide on the very index this exists to avoid — surfacing as a baffling unique-violation rather
+        /// than as "the prefix was too long".
+        /// </param>
+        public static string UniqueUsername(string prefix = "test")
+        {
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(prefix.Length, MaxUsernamePrefixLength, nameof(prefix));
+            return $"{prefix}{Guid.NewGuid():N}"[..20];
+        }
 
         // Seeds a user whose credential is stored in the current self-contained PBKDF2 format.
         public static async Task<User> CreateUserAsync(GameContext context, string username = "testuser", string password = "testpass")
