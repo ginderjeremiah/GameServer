@@ -1149,7 +1149,7 @@ namespace Game.Application.Tests.DataAccess
         {
             using var scope = CreateScope();
             var logger = new CapturingLogger<DataProviderSynchronizer>();
-            var throwingPubSub = new ThrowingPubSubService();
+            var throwingPubSub = new SubscribeThrowingPubSubService();
             var synchronizer = new DataProviderSynchronizer(scope.ServiceProvider, throwingPubSub, logger, TestRetryPolicy);
 
             await Assert.ThrowsAsync<InvalidOperationException>(() => synchronizer.StartAsync(CancellationToken.None));
@@ -2490,7 +2490,7 @@ namespace Game.Application.Tests.DataAccess
         /// A minimal <see cref="IPubSubService"/> stub whose <c>Subscribe</c> overloads always throw, used to verify
         /// that <see cref="DataProviderSynchronizer.StartAsync"/> propagates a subscribe failure rather than swallowing it.
         /// </summary>
-        private sealed class ThrowingPubSubService : NotSupportedPubSubService
+        private sealed class SubscribeThrowingPubSubService : NotSupportedPubSubService
         {
             public override Task Subscribe(string channel, Action<(string message, string channel)> action, string? id = null) => throw new InvalidOperationException("Simulated subscribe failure.");
             public override Task Subscribe(string channel, string queueName, Func<(IPubSubQueue queue, string channel), Task> action, string id) => throw new InvalidOperationException("Simulated subscribe failure.");
@@ -2741,16 +2741,6 @@ namespace Game.Application.Tests.DataAccess
             public Task AddToQueueAsync(string value, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task AddRangeToQueueAsync(IEnumerable<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<long> RemoveRangeAsync(IReadOnlyList<string> values, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        }
-
-        /// <summary>A controllable <see cref="TimeProvider"/> so the opportunistic-reclaim grace period can be
-        /// crossed deterministically instead of relying on wall-clock delays.</summary>
-        private sealed class FakeTimeProvider(DateTimeOffset start) : TimeProvider
-        {
-            private DateTimeOffset _now = start;
-
-            public override DateTimeOffset GetUtcNow() => _now;
-            public void Advance(TimeSpan delta) => _now += delta;
         }
 
         private sealed class CapturingLogger<T> : ILogger<T>

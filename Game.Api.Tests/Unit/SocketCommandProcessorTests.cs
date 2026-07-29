@@ -759,16 +759,6 @@ namespace Game.Api.Tests.Unit
             public void HashSetIfExistsAndForget(string key, IReadOnlyDictionary<string, string> fields, TimeSpan expiry) => throw new NotSupportedException();
         }
 
-        /// <summary>A controllable <see cref="TimeProvider"/> so the switch-credit wait deadline can be
-        /// crossed deterministically instead of relying on wall-clock delays.</summary>
-        private sealed class FakeTimeProvider(DateTimeOffset start) : TimeProvider
-        {
-            private DateTimeOffset _now = start;
-
-            public override DateTimeOffset GetUtcNow() => _now;
-            public void Advance(TimeSpan delta) => _now += delta;
-        }
-
         private sealed class NoOpHostLifetime : IHostApplicationLifetime
         {
             public CancellationToken ApplicationStarted => CancellationToken.None;
