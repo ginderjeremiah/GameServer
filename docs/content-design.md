@@ -282,14 +282,14 @@ _Validation hook: each route should read coherently against the introduction sch
 
 Challenges are the **unlock layer** and the **zone gates**, and the primary vehicle of the *capability-is-earned* pillar. Organize them by **intent**:
 
-1. **Gates** — "clear zone N's boss." One per zone; the next zone's `UnlockChallengeId` points at it ([zone progression](./game-design.md#zone-progression--locking-zones-behind-challenges)). The spine.
+1. **Gates** — "clear zone N's boss." One per zone; the next zone's `UnlockChallengeId` points at it ([zone progression](./game-design-progression.md#zone-progression--locking-zones-behind-challenges)). The spine.
 2. **Mastery** — accumulating, activity-based ("defeat N of X", "deal N Poison damage", "survive N seconds of DoT"). These unlock the **tools** for a playstyle (gear / mods) and are **tied to the zone's theme**, so the pressure a zone applies and the reward for answering it sit in the same place — the sustain challenges live in the DoT zone. This is *how* investment unlocks capability.
 3. **Feats** — skill-expression ("win within N seconds", "win without taking damage", "beat the boss under-leveled"). They unlock prestige / build-defining / cosmetic rewards and reward *mastery*, not grind. Feats are where the Zone 3 build wall hands out its best prizes.
 
 **Discipline:**
 - **Theme-match mastery to zones** — a zone's available challenges should reward the playstyle that zone pressures. The introduction schedule (§2) is the source of truth for which families are available where.
 - **No orphan rewards / unreachable gates** — every non-gate challenge unlocks something reachable; exactly what the [#1390](https://github.com/ginderjeremiah/GameServer/issues/1390) progression-lint checks.
-- **Statistic coverage** — list the statistic each family needs and flag any **new** one required ("at or below" feats need a minimized statistic, see [goal direction](./game-design.md#challenge-goal-comparison-direction)). _(e.g. a "DoT survived" feat needs a stat that tracks it.)_
+- **Statistic coverage** — list the statistic each family needs and flag any **new** one required ("at or below" feats need a minimized statistic, see [goal direction](./game-design-progression.md#challenge-goal-comparison-direction)). _(e.g. a "DoT survived" feat needs a stat that tracks it.)_
 - **Density convention** — roughly per zone: **1 gate + a handful of mastery + 1–2 feats**, to keep pacing even and authoring consistent.
 
 > | Challenge | Intent | Backing statistic | Goal | Gates / unlocks |
