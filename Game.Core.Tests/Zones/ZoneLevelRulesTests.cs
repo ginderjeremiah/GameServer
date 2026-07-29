@@ -4,9 +4,9 @@ using Xunit;
 namespace Game.Core.Tests.Zones
 {
     /// <summary>
-    /// The encounter-level rules the <see cref="Zone"/> constructor and the content-authoring save both read.
-    /// <see cref="ZoneTests"/> pins the throwing side; these pin the predicates themselves, so the authoring
-    /// guard and the domain invariant can't drift apart.
+    /// The encounter-level rules the <see cref="Zone"/> constructor, the content-authoring save and the
+    /// committed-export lint all read. <see cref="ZoneTests"/> pins the throwing side; these pin the
+    /// predicates themselves, so the authoring guards and the domain invariant can't drift apart.
     /// </summary>
     public class ZoneLevelRulesTests
     {

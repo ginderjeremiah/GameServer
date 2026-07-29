@@ -11,6 +11,7 @@ import {
 } from '$lib/api';
 import type { TableSectionConfig } from '$routes/admin/workbench/entities/types';
 import { makeSkill } from '../../../../fixtures/skills';
+import { MIN_SKILL_COOLDOWN_MS } from '$lib/api/types/game-constants';
 
 /* Skill config transforms: `newItem` defaults, the derived meta line, the effects
    `newRow` defaults, and the persist path — a child-only change (effects or
@@ -303,6 +304,30 @@ describe('skillEntity', () => {
 		expect(postBodyTo('AdminTools/SetSkillEffects')).toMatchObject({
 			id: 7,
 			changes: [{ changeType: EChangeType.Add, item: { id: 0, target: ESkillEffectTarget.Opponent } }]
+		});
+	});
+
+	describe('identity section warn (cooldown floor, #2519)', () => {
+		const identityWarn = skillEntity.sections.find((s) => s.key === 'identity')?.warn;
+
+		it.each([0, 1, MIN_SKILL_COOLDOWN_MS - 1, -1])(
+			'blocks Save for a cooldown of %ims, below the one-tick floor (backend-enforced)',
+			(cooldownMs) => {
+				const s = { ...skillEntity.newItem(1), cooldownMs };
+				expect(identityWarn?.(s)).toEqual({
+					message: `Cooldown must be at least ${MIN_SKILL_COOLDOWN_MS}ms`,
+					blocking: true
+				});
+			}
+		);
+
+		it('passes at exactly the one-tick floor', () => {
+			const s = { ...skillEntity.newItem(1), cooldownMs: MIN_SKILL_COOLDOWN_MS };
+			expect(identityWarn?.(s)).toBeNull();
+		});
+
+		it('passes for a new skill, whose default cooldown is well above the floor', () => {
+			expect(identityWarn?.(skillEntity.newItem(1))).toBeNull();
 		});
 	});
 });

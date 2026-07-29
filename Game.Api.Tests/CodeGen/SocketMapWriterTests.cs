@@ -75,7 +75,7 @@ namespace Game.Api.Tests.CodeGen
             // Should appear in response types (with undefined since no response descriptor)
             Assert.Contains($"'{metadata.CommandName}': undefined;", content);
             // Request section should be empty (no entry for this command)
-            var requestSection = content[(content.IndexOf("ApiSocketRequestTypes") + 1)..];
+            var requestSection = content[(content.IndexOf("ApiSocketRequestTypes", StringComparison.Ordinal) + 1)..];
             Assert.DoesNotContain(metadata.CommandName, requestSection);
         }
 
@@ -105,8 +105,8 @@ namespace Game.Api.Tests.CodeGen
             writer.WriteSocketMap(metadata, "// Auto-generated");
 
             var content = File.ReadAllText(Path.Combine(_options.TargetDirectory, "api-socket-type-map.ts"));
-            var basicIndex = content.IndexOf("TestSocketCommandBasic");
-            var responseIndex = content.IndexOf("TestSocketCommandWithResponse");
+            var basicIndex = content.IndexOf("TestSocketCommandBasic", StringComparison.Ordinal);
+            var responseIndex = content.IndexOf("TestSocketCommandWithResponse", StringComparison.Ordinal);
             Assert.True(basicIndex < responseIndex);
         }
 
@@ -159,7 +159,7 @@ namespace Game.Api.Tests.CodeGen
 
             var content = File.ReadAllText(Path.Combine(_options.TargetDirectory, "api-socket-type-map.ts"));
             Assert.StartsWith(customComment, content);
-            Assert.False(content.StartsWith(defaultComment));
+            Assert.False(content.StartsWith(defaultComment, StringComparison.Ordinal));
         }
 
         [Fact]

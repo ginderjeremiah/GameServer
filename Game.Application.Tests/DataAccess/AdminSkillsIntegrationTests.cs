@@ -551,7 +551,150 @@ namespace Game.Application.Tests.DataAccess
             Assert.Equal("0 is not a valid skill rarity.", result.ErrorMessage);
         }
 
-        private static Contracts.Skill NewSkill(string name, ERarity rarity, int id = 0)
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1)]
+        [InlineData(GameConstants.MsPerTick - 1)]
+        [InlineData(-1)]
+        public async Task SaveSkills_SubTickCooldown_ReturnsFailureWithoutPersisting(int cooldownMs)
+        {
+            // A sub-tick cooldown makes the engine and the combat rating disagree about the same skill, so the
+            // up-front guard rejects it. A valid sibling Add in the same batch must not persist either — the
+            // pre-pass runs before the change-set processor stages anything.
+            using (var scope = CreateScope())
+            {
+                var admin = scope.ServiceProvider.GetRequiredService<IAdminSkills>();
+
+                var result = admin.SaveSkills(
+                [
+                    new Change<Contracts.Skill>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = NewSkill("Valid Sibling Skill", ERarity.Common),
+                    },
+                    new Change<Contracts.Skill>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = NewSkill("Too Fast Skill", ERarity.Common, cooldownMs: cooldownMs),
+                    },
+                ]);
+
+                Assert.False(result.Succeeded);
+                Assert.Equal($"Skill cooldown must be at least {GameConstants.MsPerTick}ms.", result.ErrorMessage);
+                await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                Assert.False(await context.Skills.AnyAsync(s => s.Name == "Too Fast Skill", CancellationToken));
+                Assert.False(await context.Skills.AnyAsync(s => s.Name == "Valid Sibling Skill", CancellationToken));
+            }
+        }
+
+        [Fact]
+        public async Task SaveSkills_EditToSubTickCooldown_IsRejectedAndLeavesTheSkillIntact()
+        {
+            // The Edit path is the one that could actually persist a bad value: EF tracks an edited entity as
+            // Modified and writes every property through, so without the guard this payload would durably
+            // overwrite a healthy cooldown.
+            int skillId;
+            using (var addScope = CreateScope())
+            {
+                var admin = addScope.ServiceProvider.GetRequiredService<IAdminSkills>();
+                Assert.True(admin.SaveSkills(
+                [
+                    new Change<Contracts.Skill>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = NewSkill("Editable Cooldown Skill", ERarity.Common, cooldownMs: 1500),
+                    },
+                ]).Succeeded);
+                await addScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using (var idScope = CreateScope())
+            {
+                var context = idScope.ServiceProvider.GetRequiredService<GameContext>();
+                skillId = (await context.Skills.SingleAsync(s => s.Name == "Editable Cooldown Skill", CancellationToken)).Id;
+            }
+            await ReloadReferenceCachesAsync();
+
+            using (var editScope = CreateScope())
+            {
+                var admin = editScope.ServiceProvider.GetRequiredService<IAdminSkills>();
+                var result = admin.SaveSkills(
+                [
+                    new Change<Contracts.Skill>
+                    {
+                        ChangeType = EChangeType.Edit,
+                        Item = NewSkill("Editable Cooldown Skill", ERarity.Common, id: skillId, cooldownMs: 0),
+                    },
+                ]);
+
+                Assert.False(result.Succeeded);
+                Assert.Equal($"Skill cooldown must be at least {GameConstants.MsPerTick}ms.", result.ErrorMessage);
+                await editScope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                var skill = await context.Skills.SingleAsync(s => s.Id == skillId, CancellationToken);
+                Assert.Equal(1500, skill.CooldownMs);
+            }
+        }
+
+        [Fact]
+        public void SaveSkills_DeleteCarryingASubTickCooldown_ReportsTheUnsupportedDelete()
+        {
+            // The cooldown pre-pass skips deletes so the more accurate rejection wins: skills are a retire-only
+            // set, and the delete would never have written the payload's cooldown anyway.
+            using var scope = CreateScope();
+            var admin = scope.ServiceProvider.GetRequiredService<IAdminSkills>();
+
+            var result = admin.SaveSkills(
+            [
+                new Change<Contracts.Skill>
+                {
+                    ChangeType = EChangeType.Delete,
+                    Item = NewSkill("Doomed Skill", ERarity.Common, id: 0, cooldownMs: 0),
+                },
+            ]);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("Delete is not supported for Skill: reference records are retired, not deleted.", result.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task SaveSkills_CooldownAtTheFloor_PersistsAndSurvivesACacheReload()
+        {
+            // The boundary is inclusive: exactly one tick is the fastest legal skill, and it must round-trip
+            // through the reference cache rebuild every admin write triggers.
+            using (var scope = CreateScope())
+            {
+                var admin = scope.ServiceProvider.GetRequiredService<IAdminSkills>();
+                Assert.True(admin.SaveSkills(
+                [
+                    new Change<Contracts.Skill>
+                    {
+                        ChangeType = EChangeType.Add,
+                        Item = NewSkill("Floor Cooldown Skill", ERarity.Common, cooldownMs: GameConstants.MsPerTick),
+                    },
+                ]).Succeeded);
+                await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().CommitAsync();
+            }
+            await ReloadReferenceCachesAsync();
+
+            using (var assertScope = CreateScope())
+            {
+                var context = assertScope.ServiceProvider.GetRequiredService<GameContext>();
+                var skill = await context.Skills.SingleAsync(s => s.Name == "Floor Cooldown Skill", CancellationToken);
+                Assert.Equal(GameConstants.MsPerTick, skill.CooldownMs);
+            }
+        }
+
+        private static Contracts.Skill NewSkill(string name, ERarity rarity, int id = 0, int cooldownMs = 1000)
         {
             return new Contracts.Skill
             {
@@ -560,7 +703,7 @@ namespace Game.Application.Tests.DataAccess
                 BaseDamage = 5m,
                 Description = "",
                 DesignerNotes = "",
-                CooldownMs = 1000,
+                CooldownMs = cooldownMs,
                 IconPath = "",
                 Word = "",
                 Pronunciation = "",

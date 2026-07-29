@@ -3,8 +3,8 @@ namespace Game.Core.Zones
     /// <summary>
     /// The encounter-level invariants a zone must satisfy, as pure predicates. <see cref="Zone"/> enforces
     /// them at construction (throwing), but a zone is authored long before it is constructed, through two
-    /// independent doors: the content-authoring save (the Workbench) and the committed-export lint (the
-    /// startup seeder's path, which never passes through that save). Both read these same rules so a
+    /// independent doors: the content-authoring save (<c>AdminZones.SaveZones</c>) and the committed-export
+    /// lint (the startup seeder's path, which never passes through that save). Both read these same rules so a
     /// mis-authored level is rejected before it reaches a row that throws on every subsequent snapshot
     /// rebuild. All three callers therefore share one definition rather than restating the comparisons.
     /// Marked <see cref="ClientMirroredAttribute"/> so the Workbench's matching validation reads the bound

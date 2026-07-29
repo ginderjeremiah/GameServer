@@ -880,6 +880,48 @@ namespace Game.Api.Tests.Integration
         }
 
         [Fact]
+        public async Task AddEditSkills_SubTickCooldown_ReturnsBadRequestAndPersistsNothing()
+        {
+            using var authClient = await SetupAuthenticatedClientAsync();
+
+            // A cooldown below one simulation tick is rejected up front and mapped to a 400 carrying the data
+            // tier's message — the engine could not fire it that fast, while the combat rating would price it
+            // as if it could (at 0 it skips the skill entirely and prices it as zero offense).
+            var changes = new[]
+            {
+                new
+                {
+                    Item = new
+                    {
+                        Id = 0,
+                        Name = "Machine Gun Skill",
+                        BaseDamage = 10m,
+                        CooldownMs = 0,
+                        Description = "Should never be saved",
+                        IconPath = "skills/fast.png",
+                        RarityId = (int)ERarity.Common,
+                        Word = "",
+                        DesignerNotes = "",
+                        Pronunciation = "",
+                        Translation = "",
+                        DamagePortions = Array.Empty<object>(),
+                        DamageMultipliers = Array.Empty<object>(),
+                        Effects = Array.Empty<object>()
+                    },
+                    ChangeType = 0 // Add
+                }
+            };
+
+            var response = await authClient.PostAsJsonAsync("/api/AdminTools/AddEditSkills", changes, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse>(CancellationToken);
+            Assert.NotNull(result);
+            Assert.Equal($"Skill cooldown must be at least {GameConstants.MsPerTick}ms.", result.ErrorMessage);
+            Assert.DoesNotContain(GetSkills(), s => s.Name == "Machine Gun Skill");
+        }
+
+        [Fact]
         public async Task AddEditSkills_EditUnknownSkill_ReturnsErrorAndPersistsNothing()
         {
             using var authClient = await SetupAuthenticatedClientAsync();

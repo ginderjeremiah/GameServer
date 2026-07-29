@@ -2,6 +2,7 @@ using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess.Admin;
 using Game.Core;
 using Game.Core.Attributes;
+using Game.Core.Skills;
 using Contracts = Game.Abstractions.Contracts;
 using Entities = Game.Infrastructure.Entities;
 
@@ -26,6 +27,11 @@ namespace Game.DataAccess.Repositories.Admin
                 return rejection;
             }
 
+            if (FindSubTickCooldown(changes) is { } cooldownRejection)
+            {
+                return cooldownRejection;
+            }
+
             return ChangeSetProcessor.Apply(changes,
                 add: item => _entityStore.Insert(ToEntity(item)),
                 edit: item =>
@@ -40,6 +46,34 @@ namespace Game.DataAccess.Repositories.Admin
                 // An edit must target an existing skill; a missing id is a not-found rejection (matching the
                 // relationship setters), validated up front by the processor before anything is staged.
                 editExists: item => _skills.LookupSkill(item.Id) is not null);
+        }
+
+        /// <summary>
+        /// Returns a rejection for the first added/edited skill whose cooldown is below
+        /// <see cref="SkillCooldownRules.MinSkillCooldownMs"/>, or <c>null</c> when every change is in range.
+        /// A sub-tick cooldown is not merely extreme — it makes the battle engine and the combat rating
+        /// disagree about the same skill (see <see cref="SkillCooldownRules.MinSkillCooldownMs"/>), so it is
+        /// rejected here rather than persisted and paid for at runtime. Deletes are skipped so a delete
+        /// (unsupported for this retire-only set) still reports that, rather than being masked by a cooldown
+        /// complaint about a value the change would never have written.
+        /// </summary>
+        private static AdminSaveResult? FindSubTickCooldown(IReadOnlyList<Change<Contracts.Skill>> changes)
+        {
+            foreach (var change in changes)
+            {
+                if (change.ChangeType == EChangeType.Delete)
+                {
+                    continue;
+                }
+
+                if (!SkillCooldownRules.IsValidCooldown(change.Item.CooldownMs))
+                {
+                    return AdminSaveResult.Failure(
+                        $"Skill cooldown must be at least {SkillCooldownRules.MinSkillCooldownMs}ms.");
+                }
+            }
+
+            return null;
         }
 
         private static Entities.Skill ToEntity(Contracts.Skill item)

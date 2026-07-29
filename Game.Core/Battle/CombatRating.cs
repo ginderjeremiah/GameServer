@@ -203,8 +203,9 @@ namespace Game.Core.Battle
                 var effectiveCooldownSec = skill.CooldownMs / effectiveCaster.GetCooldownMultiplier() / 1000.0;
                 if (effectiveCooldownSec <= 0)
                 {
-                    // Degenerate guard: unreachable through authored content (CooldownRecovery's static base
-                    // alone is already 1), but a debuffed-to-zero-or-below multiplier must not divide by zero.
+                    // Degenerate guard: unreachable through authored content (an authored cooldown is at least
+                    // one tick — SkillCooldownRules — and CooldownRecovery's static base alone is already 1),
+                    // but a debuffed-to-zero-or-below multiplier must not divide by zero.
                     continue;
                 }
 

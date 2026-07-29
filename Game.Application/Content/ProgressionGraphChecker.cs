@@ -87,7 +87,7 @@ namespace Game.Application.Content
                 CheckItems();
                 CheckItemMods();
                 CheckProficiencies();
-                CheckSkillEffects();
+                CheckSkills();
                 CheckSkillRecipes();
                 CheckOrphanSkills();
                 CheckRecipeInputOwnability();
@@ -686,20 +686,32 @@ namespace Game.Application.Content
                 }
             }
 
-            // --- Skill effects (DoT-accumulator modifier shape) -------------------------------------------
+            // --- Skills (cooldown floor, DoT-accumulator effect modifier shape) ---------------------------
 
             /// <summary>
-            /// A DoT-accumulator effect's magnitude is frozen with the caster's typed amplification at apply
-            /// time (spike #1320 Area C, <see cref="BattleContext.ApplySkillEffect"/>). That's correct for an
-            /// Additive effect, but a Multiplicative one would compound the amplification a second time when
-            /// it folds into the stack (#2169). The admin save path already rejects this combination
-            /// (<c>AdminSkills.SetEffects</c>), so this is a defense-in-depth backstop rather than a reachable
-            /// gap — matching the same-path-prerequisite pattern.
+            /// Two authored-shape checks over a live skill.
+            /// <para><b>Cooldown floor.</b> A sub-tick cooldown makes the battle engine and the combat rating
+            /// disagree about the same skill (see <see cref="SkillCooldownRules.MinSkillCooldownMs"/>).
+            /// <c>AdminSkills.SaveSkills</c> rejects it, but the content seeder imports
+            /// <c>content/*.json</c> straight into the database without passing through that guard, so this
+            /// check — which runs over the committed export in CI — is the only cover on that path.</para>
+            /// <para><b>Effect modifier shape.</b> A DoT-accumulator effect's magnitude is frozen with the
+            /// caster's typed amplification at apply time (spike #1320 Area C,
+            /// <see cref="BattleContext.ApplySkillEffect"/>). That's correct for an Additive effect, but a
+            /// Multiplicative one would compound the amplification a second time when it folds into the stack
+            /// (#2169). The admin save path already rejects this combination (<c>AdminSkills.SetEffects</c>),
+            /// so this half is a defense-in-depth backstop — matching the same-path-prerequisite pattern.</para>
             /// </summary>
-            private void CheckSkillEffects()
+            private void CheckSkills()
             {
                 foreach (var skill in Live(_graph.Skills, s => s.RetiredAt))
                 {
+                    if (!SkillCooldownRules.IsValidCooldown(skill.CooldownMs))
+                    {
+                        Error("SkillCooldownFloor", "Skill", skill.Id,
+                            $"has a cooldown of {skill.CooldownMs}ms, below the {SkillCooldownRules.MinSkillCooldownMs}ms one-tick floor — the engine cannot fire it that fast, but the combat rating prices it as if it could.");
+                    }
+
                     foreach (var effect in skill.Effects)
                     {
                         if (effect.ModifierTypeId == EModifierType.Multiplicative

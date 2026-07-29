@@ -1,6 +1,7 @@
 using Game.Abstractions.DataAccess.Admin;
 using Game.DataAccess.Repositories.Admin;
 using Xunit;
+using System.Globalization;
 
 namespace Game.Application.Tests.DataAccess
 {
@@ -29,7 +30,7 @@ namespace Game.Application.Tests.DataAccess
                 existing: existing,
                 desired: desired,
                 existingKey: e => e.Key,
-                desiredKey: d => int.Parse(d.Key),
+                desiredKey: d => int.Parse(d.Key, CultureInfo.InvariantCulture),
                 delete: e => recorder.Deleted.Add(e.Key),
                 insert: d => recorder.Inserted.Add(d.Payload),
                 resourceName: "child",
@@ -161,7 +162,7 @@ namespace Game.Application.Tests.DataAccess
                 existing: existing,
                 desired: desired,
                 existingKey: e => e.Key,
-                desiredKey: d => int.Parse(d.Key),
+                desiredKey: d => int.Parse(d.Key, CultureInfo.InvariantCulture),
                 delete: e => deletedChild = e,
                 insert: d => insertedItem = d,
                 resourceName: "child",

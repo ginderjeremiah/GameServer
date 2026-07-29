@@ -7,6 +7,7 @@ using Game.DataAccess.Mapping;
 using Game.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 using System.Text.Json;
 
 namespace Game.DataAccess.Repositories
@@ -14,6 +15,10 @@ namespace Game.DataAccess.Repositories
     internal class PlayerRepository : IPlayerRepository
     {
         private static string PlayerPrefix => Constants.CACHE_PLAYER_PREFIX;
+
+        // Invariant for the same reason as the other fleet-shared cache keys: every instance has to
+        // reproduce the key byte-for-byte, so it must not depend on the host locale.
+        private static string PlayerKey(int playerId) => string.Create(CultureInfo.InvariantCulture, $"{PlayerPrefix}_{playerId}");
 
         /// <summary>
         /// Idle TTL for the cached player aggregate. It is written on every save and load-miss re-cache
@@ -63,7 +68,7 @@ namespace Game.DataAccess.Repositories
 
         public async Task<Player?> GetPlayer(int playerId, CancellationToken cancellationToken = default)
         {
-            var playerKey = $"{PlayerPrefix}_{playerId}";
+            var playerKey = PlayerKey(playerId);
             // The cache and the database both yield the lean PlayerCacheModel, so the reference graph is
             // re-resolved from the in-memory catalogs through one rehydration path regardless of the source —
             // a cached player can never serve stale reference data (#1155).
@@ -162,7 +167,7 @@ namespace Game.DataAccess.Repositories
                 throw new PlayerPersistenceFlushFailedException(ex);
             }
 
-            var playerKey = $"{PlayerPrefix}_{player.Id}";
+            var playerKey = PlayerKey(player.Id);
 
             // Serialize the lean model rather than the aggregate, so the cached blob never holds reference data.
             // Deliberately fire-and-forget: the in-memory aggregate (not this blob) is the read-modify-write base

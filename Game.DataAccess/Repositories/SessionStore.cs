@@ -3,6 +3,7 @@ using Game.Abstractions.DataAccess;
 using Game.Abstractions.Infrastructure;
 using Game.Core.Players;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 using System.Text.Json;
 
 
@@ -78,6 +79,8 @@ namespace Game.DataAccess.Repositories
             _cache.DeleteAndForget(SessionKey(userId));
         }
 
-        private static string SessionKey(int userId) => $"{SessionPrefix}_{userId}";
+        // Invariant for the same reason as the other fleet-shared cache keys: every instance has to
+        // reproduce the key byte-for-byte, so it must not depend on the host locale.
+        private static string SessionKey(int userId) => string.Create(CultureInfo.InvariantCulture, $"{SessionPrefix}_{userId}");
     }
 }

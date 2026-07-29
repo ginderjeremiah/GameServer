@@ -259,7 +259,7 @@ namespace Game.Api.Tests.CodeGen
             var endpoint = new EndpointMetadata(method) { Endpoint = "Test" };
             var result = CodeGenTypeFormatter.GetParametersTypeText(endpoint);
             // id is not nullable/default, so not all params are optional
-            Assert.False(result.EndsWith("| undefined"));
+            Assert.False(result.EndsWith("| undefined", StringComparison.Ordinal));
         }
 
         [Fact]

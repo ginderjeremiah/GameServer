@@ -201,14 +201,14 @@ namespace Game.Api.Tests.Unit
             Assert.Equal(2, cache.CompareAndSets.Count);
             Assert.Equal(2, cache.CompareAndDeletes.Count);
 
-            var presenceClaim = Assert.Single(cache.CompareAndSets, c => c.Key.StartsWith(Constants.CACHE_PLAYER_SOCKET_PREFIX));
-            var presenceRelease = Assert.Single(cache.CompareAndDeletes, c => c.Key.StartsWith(Constants.CACHE_PLAYER_SOCKET_PREFIX));
+            var presenceClaim = Assert.Single(cache.CompareAndSets, c => c.Key.StartsWith(Constants.CACHE_PLAYER_SOCKET_PREFIX, StringComparison.Ordinal));
+            var presenceRelease = Assert.Single(cache.CompareAndDeletes, c => c.Key.StartsWith(Constants.CACHE_PLAYER_SOCKET_PREFIX, StringComparison.Ordinal));
             Assert.Equal(presenceClaim.Key, presenceRelease.Key);
             Assert.Equal(presenceClaim.NewValue, presenceRelease.DeleteIfValue);
             Assert.Equal($"{Constants.CACHE_PLAYER_SOCKET_PREFIX}_42", presenceRelease.Key);
 
-            var accountClaim = Assert.Single(cache.CompareAndSets, c => c.Key.StartsWith(Constants.CACHE_ACCOUNT_SOCKET_PREFIX));
-            var accountRelease = Assert.Single(cache.CompareAndDeletes, c => c.Key.StartsWith(Constants.CACHE_ACCOUNT_SOCKET_PREFIX));
+            var accountClaim = Assert.Single(cache.CompareAndSets, c => c.Key.StartsWith(Constants.CACHE_ACCOUNT_SOCKET_PREFIX, StringComparison.Ordinal));
+            var accountRelease = Assert.Single(cache.CompareAndDeletes, c => c.Key.StartsWith(Constants.CACHE_ACCOUNT_SOCKET_PREFIX, StringComparison.Ordinal));
             Assert.Equal(accountClaim.Key, accountRelease.Key);
             Assert.Equal(accountClaim.NewValue, accountRelease.DeleteIfValue);
             Assert.Equal($"{Constants.CACHE_ACCOUNT_SOCKET_PREFIX}_1", accountRelease.Key);
@@ -286,7 +286,7 @@ namespace Game.Api.Tests.Unit
 
             Assert.NotNull(context);
             Assert.Equal(3, cache.PresenceGetCalls);
-            var presenceClaim = Assert.Single(cache.CompareAndSets, c => c.Key.StartsWith(Constants.CACHE_PLAYER_SOCKET_PREFIX));
+            var presenceClaim = Assert.Single(cache.CompareAndSets, c => c.Key.StartsWith(Constants.CACHE_PLAYER_SOCKET_PREFIX, StringComparison.Ordinal));
             Assert.Null(presenceClaim.ExpectedValue);
         }
 
@@ -334,11 +334,11 @@ namespace Game.Api.Tests.Unit
             // (#1817) were still released via a compare-and-delete keyed on what each was claimed with (so a
             // newer owner's key would be left intact).
             Assert.Equal(2, cache.CompareAndDeletes.Count);
-            var presenceRelease = Assert.Single(cache.CompareAndDeletes, c => c.Key.StartsWith(Constants.CACHE_PLAYER_SOCKET_PREFIX));
+            var presenceRelease = Assert.Single(cache.CompareAndDeletes, c => c.Key.StartsWith(Constants.CACHE_PLAYER_SOCKET_PREFIX, StringComparison.Ordinal));
             Assert.Equal($"{Constants.CACHE_PLAYER_SOCKET_PREFIX}_77", presenceRelease.Key);
             Assert.Equal(context.SocketId, presenceRelease.DeleteIfValue);
 
-            var accountRelease = Assert.Single(cache.CompareAndDeletes, c => c.Key.StartsWith(Constants.CACHE_ACCOUNT_SOCKET_PREFIX));
+            var accountRelease = Assert.Single(cache.CompareAndDeletes, c => c.Key.StartsWith(Constants.CACHE_ACCOUNT_SOCKET_PREFIX, StringComparison.Ordinal));
             Assert.Equal($"{Constants.CACHE_ACCOUNT_SOCKET_PREFIX}_1", accountRelease.Key);
             Assert.Equal($"77:{context.SocketId}", accountRelease.DeleteIfValue);
             Assert.Contains(_logs.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("unsubscribe"));

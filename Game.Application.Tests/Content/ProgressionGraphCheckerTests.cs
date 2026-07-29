@@ -819,6 +819,47 @@ namespace Game.Application.Tests.Content
             Assert.DoesNotContain(findings, f => f.Check == "SkillEffectDotModifier");
         }
 
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1)]
+        [InlineData(GameConstants.MsPerTick - 1)]
+        public void Skill_CooldownBelowOneTick_IsError(int cooldownMs)
+        {
+            // The admin save rejects this, but the content seeder imports content/*.json straight into the
+            // database without passing through that guard — so this lint is the only cover on the seed path.
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills.Append(Skill(6, ESkillAcquisition.Player, cooldownMs: cooldownMs)).ToList(),
+            };
+            AssertHasFinding(graph, "SkillCooldownFloor", ContentGraphSeverity.Error, "Skill", 6);
+        }
+
+        [Fact]
+        public void Skill_CooldownAtOneTick_ProducesNoFinding()
+        {
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills
+                    .Append(Skill(6, ESkillAcquisition.Player, cooldownMs: GameConstants.MsPerTick))
+                    .ToList(),
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "SkillCooldownFloor");
+        }
+
+        [Fact]
+        public void Skill_RetiredWithSubTickCooldown_ProducesNoFinding()
+        {
+            // A retired skill is out of circulation, so it never reaches a battler — the lint checks live
+            // sources only, matching every other check in the pass.
+            var graph = HealthyGraph() with
+            {
+                Skills = HealthyGraph().Skills
+                    .Append(Skill(6, ESkillAcquisition.Player, retiredAt: Retired, cooldownMs: 0))
+                    .ToList(),
+            };
+            Assert.DoesNotContain(_checker.Check(graph), f => f.Check == "SkillCooldownFloor");
+        }
+
         // --- Skill recipes ----------------------------------------------------------------------------
 
         [Fact]
@@ -1413,7 +1454,8 @@ namespace Game.Application.Tests.Content
             EDamageType primaryType = EDamageType.Physical,
             (EAttribute attributeId, decimal multiplier)[]? damageMultipliers = null,
             (EAttribute attributeId, decimal scalingAmount)[]? effectScaling = null,
-            IReadOnlyList<Contracts.SkillEffect>? effects = null) => new()
+            IReadOnlyList<Contracts.SkillEffect>? effects = null,
+            int cooldownMs = 1000) => new()
             {
                 Id = id,
                 Name = $"Skill {id}",
@@ -1433,7 +1475,7 @@ namespace Game.Application.Tests.Content
                 .ToList(),
                 DamagePortions = [new Contracts.SkillDamagePortion { Type = primaryType, Weight = 1 }],
                 Description = "",
-                CooldownMs = 1000,
+                CooldownMs = cooldownMs,
                 IconPath = "",
                 RarityId = ERarity.Common,
                 Word = "",

@@ -21,6 +21,55 @@ dotnet_diagnostic.IDE0305.severity = none
 # is exercised directly by DataAccessCancellationTests.
 dotnet_diagnostic.xUnit1051.severity = none
 
+# ── Globalization (CA13xx) ──────────────────────────────────────────────────────────────────────
+# The whole category is off in the analyzers' default mode, so the same culture-sensitive-casing bug
+# was fixed three times by review alone (#2464/#2471, #2472/#2490). These are enabled per-rule rather
+# than via AnalysisMode=All so the list records exactly which risks we buy, and so an SDK adding a
+# rule to the category can't fail the build unannounced. CI builds with -warnaserror, so `warning` is
+# already fatal there — that single lever stays the enforcement mechanism.
+
+# CA1304/CA1311: ToUpper/ToLower without an explicit culture. This pair is what catches the recurring
+# bug — casing feeds persisted seed data and codegen'd client identifiers, so a tr-TR host must not be
+# able to change the value (leading "i" → dotted "İ", "Id" → dotless "ıd").
+dotnet_diagnostic.CA1304.severity = warning
+dotnet_diagnostic.CA1311.severity = warning
+
+# CA1309/CA1310: comparison that is culture-sensitive by *default* (StartsWith/EndsWith/IndexOf/Compare)
+# or explicitly culture-ordered when ordinal was meant. The project's standard is ordinal everywhere —
+# no string comparison here is a linguistic one.
+dotnet_diagnostic.CA1309.severity = warning
+dotnet_diagnostic.CA1310.severity = warning
+
+# CA1307: the *clarity* half of the same family (Equals/Contains/Replace/GetHashCode). Deliberately
+# off: those overloads already default to ordinal, so all 341 hits are correct as written and
+# annotating them would be pure churn with no behaviour change. CA1310 above covers the half that is
+# actually culture-sensitive by default.
+dotnet_diagnostic.CA1307.severity = none
+
+# CA1305: IFormatProvider. On everywhere except the codegen writers (scoped off below), which is where
+# 35 of its 38 hits were: interpolated StringBuilder.Append calls whose holes are all strings, since the
+# rule fires on the interpolation overload regardless of hole type. Keeping it live over the rest buys a
+# real guard on the data tier and API, where a `.ToString()` on an id reaching a persisted key or a wire
+# value would land. Note the limits — it only fires where an IFormatProvider overload exists to suggest
+# (.ToString()/string.Format/Parse/Convert.To*), so it is blind to two shapes this codebase uses a lot:
+# a bare `$"..."` assigned to string, and TryParse (verified — it fires on int.Parse(s) but not on
+# int.TryParse(s, out v)). So the interpolated cache-key builders and the claim parses are held by
+# convention and comment, not the analyzer.
+dotnet_diagnostic.CA1305.severity = warning
+
+# CA1308: normalize strings to uppercase. Off — the one hit is CodeGenExtensions.SnakeCase, which
+# lowercases invariantly to emit kebab-case *filenames*. The rule guards round-tripping a comparison
+# key, which this is not.
+dotnet_diagnostic.CA1308.severity = none
+
+# The codegen writers build TypeScript by interpolating already-formatted strings into StringBuilder,
+# which trips CA1305 on every such call with no numeric hole to guard. Numbers that genuinely reach the
+# emitted output are converted with InvariantCulture at the point of conversion instead, pinned by the
+# sv-SE tests in ConstantsWriterTests/StaticModifierWriterTests (locale-dependent output would be a TS
+# syntax change, not just different bytes — see docs/infrastructure.md).
+[Game.Api/CodeGen/**.cs]
+dotnet_diagnostic.CA1305.severity = none
+
 # Apply Windows-style CRLF line endings specifically to batch files
 [*.bat]
 end_of_line = crlf

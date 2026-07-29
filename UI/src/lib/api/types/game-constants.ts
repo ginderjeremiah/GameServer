@@ -52,4 +52,5 @@ export const MS_PER_TICK = 40;
 export const PUNCH_SKILL_ID = 0;
 export const STAT_POINTS_PER_LEVEL = 2;
 export const TOUGHNESS_MITIGATION_CONSTANT = 200;
+export const MIN_SKILL_COOLDOWN_MS = 40;
 export const MIN_ZONE_LEVEL = 1;
