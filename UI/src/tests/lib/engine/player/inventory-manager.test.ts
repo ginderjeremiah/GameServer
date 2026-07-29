@@ -200,7 +200,7 @@ describe('InventoryManager', () => {
 		// #2521: `startGame` re-initializes on every game-page mount, so a client-side `/game` re-entry that
 		// pulled no fresh player aggregate must not rebuild from the login-time payload — that would revert
 		// the session's equips/mods/unlocks locally while the server still holds them.
-		it('skips the rebuild when the same payload is re-delivered, keeping session mutations', async () => {
+		it('skips the rebuild when no new payload arrived, keeping session mutations', async () => {
 			mockItems[1] = makeItem(1);
 			mockItems[2] = makeItem(2);
 			mockItemMods[10] = makeItemMod(10);
