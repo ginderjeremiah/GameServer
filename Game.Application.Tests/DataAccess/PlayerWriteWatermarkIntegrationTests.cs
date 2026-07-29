@@ -200,7 +200,7 @@ namespace Game.Application.Tests.DataAccess
 
             using (var scope = CreateScope())
             {
-                DescribeSequence(scope, 4);
+                PlayerUpdateTestHelpers.DescribeSequence(scope, 4);
                 var guard = scope.ServiceProvider.GetRequiredService<PlayerWriteWatermarkGuard>();
 
                 // The watermark advance and the data write share one transaction precisely so this can't
@@ -235,7 +235,7 @@ namespace Game.Application.Tests.DataAccess
 
             using (var scope = CreateScope())
             {
-                DescribeSequence(scope, 4);
+                PlayerUpdateTestHelpers.DescribeSequence(scope, 4);
                 var guard = scope.ServiceProvider.GetRequiredService<PlayerWriteWatermarkGuard>();
 
                 // Mirrors ProgressUpdatedHandler's load-then-upsert shape, with the concurrent insert forced
@@ -989,7 +989,7 @@ namespace Game.Application.Tests.DataAccess
             {
                 await Task.WhenAll(events.Zip(scopes, (evt, scope) => Task.Run(() =>
                 {
-                    DescribeSequence(scope, sequence);
+                    PlayerUpdateTestHelpers.DescribeSequence(scope, sequence);
                     return scope.ServiceProvider.GetRequiredService<IPlayerUpdateHandler<TEvent>>().HandleAsync(evt);
                 })));
             }
@@ -1027,7 +1027,7 @@ namespace Game.Application.Tests.DataAccess
         }
 
         private static PlayerCoreUpdatedEvent CoreEvent(int playerId, int level, int exp)
-            => new(playerId, level, exp, 0, 100, 100, DateTime.UtcNow, false, null);
+            => PlayerUpdateTestHelpers.CoreEvent(playerId, level, exp);
 
         // The event always carries the player's complete spread, which is what makes its player-scoped
         // watermark key defensible — so the fixture states every allocation rather than just the varying one.
@@ -1083,31 +1083,16 @@ namespace Game.Application.Tests.DataAccess
         private async Task<int> ApplyAsync<TEvent>(TEvent evt, long sequence)
         {
             using var scope = CreateScope();
-            DescribeSequence(scope, sequence);
+            PlayerUpdateTestHelpers.DescribeSequence(scope, sequence);
             var handler = scope.ServiceProvider.GetRequiredService<IPlayerUpdateHandler<TEvent>>();
             await handler.HandleAsync(evt);
             return scope.ServiceProvider.GetRequiredService<PlayerUpdateContext>().RejectedTargetCount;
         }
 
-        // Publishes the envelope's sequence onto the scope exactly as PlayerUpdateEventDispatcher does; the
-        // payload itself is irrelevant here since the handler is invoked directly with a typed event.
-        private static void DescribeSequence(IServiceScope scope, long sequence)
-        {
-            scope.ServiceProvider.GetRequiredService<PlayerUpdateContext>().Describe(new DomainEventEnvelope
-            {
-                Type = "test",
-                Payload = "{}",
-                Sequence = sequence,
-            });
-        }
-
         private async Task<long?> ReadWatermarkAsync(int playerId, PlayerWriteStream stream, string targetKey)
         {
             using var scope = CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<GameContext>();
-            var row = await context.PlayerWriteWatermarks.AsNoTracking()
-                .SingleOrDefaultAsync(w => w.PlayerId == playerId && w.Stream == stream && w.TargetKey == targetKey, CancellationToken);
-            return row?.LastAppliedSequence;
+            return await PlayerUpdateTestHelpers.ReadWatermarkAsync(scope, playerId, stream, targetKey, CancellationToken);
         }
 
         private async Task<decimal?> ReadStatisticAsync(int playerId, EStatisticType type, int? entityId)
