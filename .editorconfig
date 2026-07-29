@@ -50,9 +50,10 @@ dotnet_diagnostic.CA1307.severity = none
 # 35 of its 38 hits were: interpolated StringBuilder.Append calls whose holes are all strings, since the
 # rule fires on the interpolation overload regardless of hole type. Keeping it live over the rest buys a
 # real guard on the data tier and API, where a `.ToString()` on an id reaching a persisted key or a wire
-# value would land. Note the limit: CA1305 does not fire on a bare `$"..."` assigned to string (there is
-# no IFormatProvider overload to suggest), so it covers the .ToString()/string.Format half only — the
-# interpolated cache-key builders are held by convention and comment, not by the analyzer.
+# value would land. Note the limits — it covers .ToString()/string.Format/Parse only, and is blind to two
+# shapes this codebase uses a lot: a bare `$"..."` assigned to string (no IFormatProvider overload to
+# suggest), and TryParse (verified — it fires on int.Parse(s) but not int.TryParse(s, out v)). So the
+# interpolated cache-key builders and the claim parses are held by convention and comment, not the analyzer.
 dotnet_diagnostic.CA1305.severity = warning
 
 # CA1308: normalize strings to uppercase. Off — the one hit is CodeGenExtensions.SnakeCase, which

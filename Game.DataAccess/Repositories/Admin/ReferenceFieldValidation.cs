@@ -42,6 +42,11 @@ namespace Game.DataAccess.Repositories.Admin
                 var value = field(change.Item);
                 if (!Enum.IsDefined(value))
                 {
+                    // The InvariantCulture argument satisfies CA1305 but does nothing: Enum's IConvertible
+                    // ignores the provider, and the resulting int is then formatted by the interpolation
+                    // under the ambient culture. Unlike the load-bearing annotations on the cache-key
+                    // builders, this one is analyzer-appeasement — the message is a diagnostic, not a
+                    // persisted key, so it is deliberately left outside the invariant convention.
                     return AdminSaveResult.Failure(
                         $"{Convert.ToInt32(value, CultureInfo.InvariantCulture)} is not a valid {fieldName}.");
                 }

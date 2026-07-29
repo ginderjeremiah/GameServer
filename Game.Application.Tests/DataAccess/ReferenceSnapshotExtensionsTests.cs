@@ -1,3 +1,4 @@
+using Game.Core.TestInfrastructure.Helpers;
 using Game.DataAccess.Repositories;
 using Game.Infrastructure.Entities;
 using Xunit;
@@ -55,11 +56,19 @@ namespace Game.Application.Tests.DataAccess
         [InlineData(int.MaxValue)]
         public void GetById_IdOutOfRange_ThrowsDescriptiveArgumentOutOfRange(int id)
         {
+            // The message under assertion is built by a bare interpolation, so it formats the id under the
+            // ambient culture. Pinning the culture keeps both halves of the comparison on one rulebook —
+            // otherwise the -1 case fails on a host whose negative sign isn't ASCII (sv-SE renders U+2212).
+            // Exception text is a diagnostic, not a persisted key or wire value, so it is deliberately
+            // outside the invariant-formatting convention in docs/backend.md; the test absorbs the
+            // difference rather than the convention widening to every message in the codebase.
+            using var culture = new CultureScope(CultureInfo.InvariantCulture.Name);
+
             var ex = Assert.Throws<ArgumentOutOfRangeException>(() => Snapshot.GetById(id, "widget"));
 
             Assert.Equal(id, ex.ActualValue);
-            Assert.Contains("widget", ex.Message);
-            Assert.Contains(id.ToString(CultureInfo.InvariantCulture), ex.Message);
+            Assert.Contains("widget", ex.Message, StringComparison.Ordinal);
+            Assert.Contains(id.ToString(CultureInfo.InvariantCulture), ex.Message, StringComparison.Ordinal);
         }
 
         [Fact]
