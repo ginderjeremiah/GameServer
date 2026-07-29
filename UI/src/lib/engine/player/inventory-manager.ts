@@ -1,4 +1,5 @@
 import {
+	IInventoryData,
 	IInventoryItem,
 	IBattlerAttribute,
 	ELogType,
@@ -98,13 +99,35 @@ export class InventoryManager {
 	 */
 	#generation = 0;
 
+	/**
+	 * The inventory payload this manager last derived from, so a re-derive against that same payload can be
+	 * skipped (see {@link initialize}). `#`-private for the same reason as {@link #queue} above.
+	 */
+	#derivedFrom: IInventoryData | undefined;
+
+	/**
+	 * Derives the live inventory — unlocked items/mods and the equipped slots — from the player aggregate's
+	 * current inventory payload, replacing everything this manager holds.
+	 *
+	 * Skipped when that payload is the same one it last derived from. `playerManager.inventoryData` is a
+	 * read-once handoff buffer, replaced wholesale only when a player load delivers a fresh aggregate: the
+	 * session's own mutations (equip/unequip, mods, favorites, push-granted unlocks) land on this manager's
+	 * item objects and are deliberately never written back to it. Re-deriving from an unchanged payload
+	 * would therefore revert every such change locally while the server still holds it (#2521) — which is
+	 * what a `startGame` on a client-side `/game` re-entry, and a resync whose player refresh failed, would
+	 * otherwise do. The generation is left alone on the skip so an in-flight mutation can still roll back:
+	 * nothing was rebuilt, so its snapshot is still a valid baseline.
+	 */
 	public initialize() {
+		const data = playerManager.inventoryData;
+		if (data === this.#derivedFrom) {
+			return;
+		}
+		this.#derivedFrom = data;
 		this.#generation++;
 		const unlockedItems: Map<number, Item> = new Map();
 		const unlockedMods: Set<number> = new Set();
 		const equippedSlots: (Item | undefined)[] = new Array(6).fill(undefined);
-
-		const data = playerManager.inventoryData;
 
 		// Load unlocked mods
 		for (const modId of data.unlockedMods) {

@@ -8,9 +8,16 @@ import { makeItem as makeItemContract } from '../../../fixtures/items';
 // Aliased for the same reason: the local `makeItemMod` is an id-only adapter over the shared builder.
 import { makeItemMod as makeItemModContract } from '../../../fixtures/item-mods';
 
-const mockInventoryData: IInventoryData = {
+let mockInventoryData: IInventoryData = {
 	unlockedItems: [],
 	unlockedMods: []
+};
+
+/** Simulates a player load delivering a fresh inventory payload — a whole new object, as a parsed
+ *  `Auth/Status` response always is. That freshness is what makes the manager re-derive rather than skip
+ *  the rebuild (#2521), so a test exercising a second `initialize` must deliver through this. */
+const deliverInventoryData = (data: Partial<IInventoryData> = {}) => {
+	mockInventoryData = { unlockedItems: [], unlockedMods: [], ...data };
 };
 
 vi.mock('$lib/engine', () => ({
@@ -120,8 +127,7 @@ describe('InventoryManager', () => {
 		mockItems.length = 0;
 		mockItemMods.length = 0;
 		mockSkills.length = 0;
-		mockInventoryData.unlockedItems = [];
-		mockInventoryData.unlockedMods = [];
+		deliverInventoryData();
 		playerManager.playerRating = 0;
 	});
 
@@ -184,12 +190,59 @@ describe('InventoryManager', () => {
 			mockInventoryData.unlockedItems = [{ itemId: 1, equipped: false, appliedMods: [], favorite: false }];
 			manager.initialize();
 
-			mockInventoryData.unlockedItems = [];
-			mockInventoryData.unlockedMods = [];
+			deliverInventoryData();
 			manager.initialize();
 
 			expect(manager.unlockedItems.size).toBe(0);
 			expect(manager.unlockedMods.size).toBe(0);
+		});
+
+		// #2521: `startGame` re-initializes on every game-page mount, so a client-side `/game` re-entry that
+		// pulled no fresh player aggregate must not rebuild from the login-time payload — that would revert
+		// the session's equips/mods/unlocks locally while the server still holds them.
+		it('skips the rebuild when the same payload is re-delivered, keeping session mutations', async () => {
+			mockItems[1] = makeItem(1);
+			mockItems[2] = makeItem(2);
+			mockItemMods[10] = makeItemMod(10);
+			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
+			mockInventoryData.unlockedMods = [10];
+			manager.initialize();
+
+			await manager.equipItem(1, EEquipmentSlot.WeaponSlot);
+			await manager.applyMod(1, 10, 0);
+			await manager.setFavorite(1, true);
+			manager.addUnlockedItem(makeInventoryItem({ itemId: 2 }));
+			manager.addUnlockedMod(11);
+			const equipped = manager.equippedSlots[EEquipmentSlot.WeaponSlot];
+
+			manager.initialize();
+
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]).toBe(equipped);
+			expect(manager.unlockedItems.get(1)?.appliedMods).toHaveLength(1);
+			expect(manager.unlockedItems.get(1)?.favorite).toBe(true);
+			expect(manager.unlockedItems.has(2)).toBe(true);
+			expect(manager.unlockedMods.has(11)).toBe(true);
+		});
+
+		it('still rolls back an in-flight mutation after a skipped rebuild', async () => {
+			// The skip leaves the generation untouched, so the pending equip's snapshot is still a valid
+			// baseline — unlike a real resync, which supersedes it (#1808).
+			mockItems[1] = makeItem(1);
+			mockInventoryData.unlockedItems = [makeInventoryItem({ itemId: 1 })];
+			manager.initialize();
+
+			let resolveSend: (value: { error?: string }) => void = () => {};
+			mockSendSocketCommand.mockReturnValueOnce(new Promise((resolve) => (resolveSend = resolve)));
+			const pending = manager.equipItem(1, EEquipmentSlot.WeaponSlot);
+			await flush();
+
+			manager.initialize();
+
+			resolveSend({ error: 'nope' });
+			await pending;
+
+			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]).toBeUndefined();
+			expect(manager.unlockedItems.get(1)?.equipped).toBe(false);
 		});
 	});
 
@@ -726,9 +779,9 @@ describe('InventoryManager', () => {
 			// A mid-session resync (e.g. resyncPlayerAndInventory after a lost DefeatEnemy response) rebuilds
 			// the inventory with fresh item instances while the equip's persist is still in flight. The
 			// authoritative state shows the equip actually landed server-side — only the ack was lost.
-			mockInventoryData.unlockedItems = [
-				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot })
-			];
+			deliverInventoryData({
+				unlockedItems: [makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot })]
+			});
 			manager.initialize();
 			const postResyncItem = manager.unlockedItems.get(1);
 			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]?.itemId).toBe(1);
@@ -772,9 +825,9 @@ describe('InventoryManager', () => {
 
 			// The resync's authoritative state has the item still equipped (the unequip never reached the
 			// server before the resync fired).
-			mockInventoryData.unlockedItems = [
-				makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot })
-			];
+			deliverInventoryData({
+				unlockedItems: [makeInventoryItem({ itemId: 1, equipped: true, equipmentSlotId: EEquipmentSlot.WeaponSlot })]
+			});
 			manager.initialize();
 			const postResyncItem = manager.unlockedItems.get(1);
 			expect(manager.equippedSlots[EEquipmentSlot.WeaponSlot]?.itemId).toBe(1);

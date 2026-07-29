@@ -45,6 +45,10 @@ export class PlayerManager implements IPlayerData {
 	 *  trigger-evaluation/tour-playback consumer (#1587) reads this; this class only syncs it with the
 	 *  server. */
 	public lessons: IPlayerLesson[] = [];
+	/** The raw inventory payload from the last player load — the seed `InventoryManager` derives its live
+	 *  item objects from, not a mirror of them: the session's equip/mod/favorite/unlock mutations land on
+	 *  that manager alone. Replaced wholesale by {@link initialize} and never mutated in place, so the
+	 *  manager can tell a freshly delivered payload from the one it already derived (#2521). */
 	public inventoryData: IInventoryData = {
 		unlockedItems: [],
 		unlockedMods: []
