@@ -10,6 +10,7 @@ import {
 	type ISkill
 } from '$lib/api';
 import { MIN_SKILL_COOLDOWN_MS } from '$lib/api/types/game-constants';
+import { dotTypeForAccumulator } from '$lib/battle/damage-types';
 import { staticData } from '$stores';
 import { reference } from '../reference.svelte';
 import {
@@ -237,6 +238,16 @@ export const skillEntity: EntityConfig<ISkill> = {
 			glyph: 'bolt',
 			desc: 'Timed attribute buffs/debuffs applied when the skill fires',
 			count: (s) => s.effects.length,
+			// A DoT-accumulator effect's magnitude is frozen with the caster's typed amplification at apply
+			// time (#1320 Area C), which only reads as a per-second rate when the modifier is Additive — a
+			// Multiplicative one would compound that amplification again. Hard-rejected by
+			// AdminSkills.SetEffects (#2169), so it blocks Save (#2520).
+			warn: (s) =>
+				s.effects.some(
+					(e) => e.modifierTypeId === EModifierType.Multiplicative && dotTypeForAccumulator(e.attributeId) !== undefined
+				)
+					? { message: 'A DoT-accumulator effect must be Additive', blocking: true }
+					: null,
 			kind: 'table',
 			itemsKey: 'effects',
 			rowKey: 'id',
