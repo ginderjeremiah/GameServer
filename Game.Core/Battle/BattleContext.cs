@@ -70,7 +70,10 @@ namespace Game.Core.Battle
         /// per-second accumulator, the caster's typed amplification is then <b>frozen</b> into the magnitude at
         /// apply time (spike #1320, Area C) — consistent with how the caster scaling already freezes — so the
         /// accumulated DoT carries the caster's amplification while the defender's resistance is sampled live
-        /// each tick by <see cref="Battler.ApplyDamageOverTime"/>.
+        /// each tick by <see cref="Battler.ApplyDamageOverTime"/>. That freeze reads as a per-second rate only
+        /// for an <see cref="EModifierType.Additive"/> effect, which is why a Multiplicative DoT-accumulator
+        /// effect is unauthorable (#2169: <c>AdminSkills.SetEffects</c>, the <c>SkillEffectDotModifier</c> lint
+        /// and the Workbench's blocking warn) rather than special-cased here.
         /// </summary>
         public void ApplySkillEffect(SkillEffect effect)
         {

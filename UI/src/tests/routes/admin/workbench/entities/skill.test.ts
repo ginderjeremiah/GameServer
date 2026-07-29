@@ -12,6 +12,7 @@ import {
 import type { TableSectionConfig } from '$routes/admin/workbench/entities/types';
 import { makeSkill } from '../../../../fixtures/skills';
 import { MIN_SKILL_COOLDOWN_MS } from '$lib/api/types/game-constants';
+import { dotAccumulators } from '$lib/battle/damage-types';
 
 /* Skill config transforms: `newItem` defaults, the derived meta line, the effects
    `newRow` defaults, and the persist path — a child-only change (effects or
@@ -171,6 +172,8 @@ describe('skillEntity', () => {
 		expect(multipliers.count?.(filled)).toBe(1);
 		expect(multipliers.warn?.(filled)).toBeNull();
 		expect(effects.count?.(filled)).toBe(2);
+		// Both fixture effects are Multiplicative on Toughness — not a DoT accumulator, so nothing warns.
+		expect(effects.warn?.(filled)).toBeNull();
 	});
 
 	it('portions newRow picks the first free damage type with a default weight of 1', () => {
@@ -328,6 +331,61 @@ describe('skillEntity', () => {
 
 		it('passes for a new skill, whose default cooldown is well above the floor', () => {
 			expect(identityWarn?.(skillEntity.newItem(1))).toBeNull();
+		});
+	});
+
+	describe('effects section warn (DoT-accumulator modifier shape, #2520)', () => {
+		const effectsWarn = tableSection('effects').warn;
+		const blocking = { message: 'A DoT-accumulator effect must be Additive', blocking: true };
+		const withEffects = (effects: ISkill['effects']): ISkill => ({ ...skillEntity.newItem(1), effects });
+
+		// Driven off the generated accumulator table rather than an enumerated list, so a new DoT type is
+		// covered without remembering to widen this test.
+		it.each(dotAccumulators().map((a) => a.accumulator))(
+			'blocks Save for a Multiplicative effect on DoT accumulator %i (backend-enforced)',
+			(accumulator) => {
+				const skill = withEffects([effect({ attributeId: accumulator, modifierTypeId: EModifierType.Multiplicative })]);
+				expect(effectsWarn?.(skill)).toEqual(blocking);
+			}
+		);
+
+		it.each(dotAccumulators().map((a) => a.accumulator))(
+			'passes for an Additive effect on DoT accumulator %i — the shape the engine and rating assume',
+			(accumulator) => {
+				const skill = withEffects([effect({ attributeId: accumulator, modifierTypeId: EModifierType.Additive })]);
+				expect(effectsWarn?.(skill)).toBeNull();
+			}
+		);
+
+		it('passes for a Multiplicative effect on a non-accumulator attribute', () => {
+			const skill = withEffects([
+				effect({ attributeId: EAttribute.Toughness, modifierTypeId: EModifierType.Multiplicative })
+			]);
+			expect(effectsWarn?.(skill)).toBeNull();
+		});
+
+		it('flags the skill when only one of several effects carries the bad shape', () => {
+			const skill = withEffects([
+				effect({ id: 1, attributeId: EAttribute.Toughness, modifierTypeId: EModifierType.Multiplicative }),
+				effect({ id: 2, attributeId: EAttribute.BleedDamagePerSecond, modifierTypeId: EModifierType.Additive }),
+				effect({ id: 3, attributeId: EAttribute.PoisonDamagePerSecond, modifierTypeId: EModifierType.Multiplicative })
+			]);
+			expect(effectsWarn?.(skill)).toEqual(blocking);
+		});
+
+		it('flags a Self-targeted effect too — the freeze is target-independent', () => {
+			const skill = withEffects([
+				effect({
+					target: ESkillEffectTarget.Self,
+					attributeId: EAttribute.BurnDamagePerSecond,
+					modifierTypeId: EModifierType.Multiplicative
+				})
+			]);
+			expect(effectsWarn?.(skill)).toEqual(blocking);
+		});
+
+		it('passes for a skill with no effects', () => {
+			expect(effectsWarn?.(skillEntity.newItem(1))).toBeNull();
 		});
 	});
 });
