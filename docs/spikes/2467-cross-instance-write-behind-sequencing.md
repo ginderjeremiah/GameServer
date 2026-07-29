@@ -216,7 +216,9 @@ This is the price of one guard mechanism instead of two. Per-row version columns
 single-row handlers do it in one atomic conditional statement with no transaction at all — but they don't
 survive `ModRemovedHandler`'s tombstone (below), so taking that cheaper path means shipping both
 mechanisms. The drain is off the player's request path, so paying transaction framing here is the right
-trade.
+trade — and it has since been measured rather than left as an assertion (#2497; the number lives in
+`backend-persistence.md`, which is where it belongs, and it came in well under what counting round trips
+would suggest).
 
 **A single "last applied sequence" per player — the issue's first suggested fork — is wrong, and this is
 the most important finding of the spike.** The guard's granularity must be at least as fine as the row
