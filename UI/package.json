@@ -14,7 +14,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "eslint . && npm run check",
 		"format": "prettier --write .",
-		"test:e2e": "playwright test",
+		"test:e2e": "svelte-kit sync && playwright test",
 		"test:unit": "vitest",
 		"test:unit:ci": "vitest --run --reporter=minimal --reporter=json --outputFile.json=./unit-test-results.json --coverage",
 		"test:unit:coverage": "vitest --run --coverage"

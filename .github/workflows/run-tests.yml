@@ -426,7 +426,12 @@ jobs:
 
     - name: Run Playwright e2e tests
       working-directory: UI
-      run: npx playwright test --project="${{ matrix.browser }}"
+      # Goes through the npm script rather than `npx playwright` directly, because the script owns
+      # the `svelte-kit sync` that has to precede it: `UI/tsconfig.json` extends the generated
+      # (gitignored) `.svelte-kit/tsconfig.json`, and Playwright resolves that tsconfig when it
+      # loads `playwright.config.ts`. Every other frontend job syncs as a side effect (`npm run
+      # lint` → `check`, `vite build`) or bypasses the tsconfig entirely (vitest).
+      run: npm run test:e2e -- --project="${{ matrix.browser }}"
 
     - name: Dump container logs on failure
       if: failure()
