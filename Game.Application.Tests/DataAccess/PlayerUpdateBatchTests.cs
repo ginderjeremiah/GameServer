@@ -227,11 +227,5 @@ namespace Game.Application.Tests.DataAccess
                 return Task.CompletedTask;
             }
         }
-
-        private sealed class ThrowingPubSubService : NotSupportedPubSubService
-        {
-            public override Task PublishBatch<T>(string channel, string queueName, IEnumerable<T> queueData, CancellationToken cancellationToken = default)
-                => throw new InvalidOperationException("Simulated transient publish failure.");
-        }
     }
 }

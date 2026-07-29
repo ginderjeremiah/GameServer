@@ -1,5 +1,5 @@
-using Game.Abstractions.DataAccess;
 using Game.Application.Services;
+using Game.TestInfrastructure.Helpers;
 using Xunit;
 
 namespace Game.Application.Tests.Services
@@ -33,40 +33,6 @@ namespace Game.Application.Tests.Services
             await service.SaveDeviceInfo(5, "fp", null, null, null, 8, 4, cts.Token);
 
             Assert.Equal(cts.Token, userLogins.LastSaveToken);
-        }
-
-        private sealed class FakeUserLogins : IUserLogins
-        {
-            public CancellationToken LastRecordToken { get; private set; }
-            public CancellationToken LastSaveToken { get; private set; }
-
-            public Task RecordConnection(
-                int userId,
-                string ipAddress,
-                string deviceFingerprintHash,
-                string userAgent,
-                string? secChUa,
-                string? secChUaMobile,
-                string? secChUaPlatform,
-                CancellationToken cancellationToken = default)
-            {
-                LastRecordToken = cancellationToken;
-                return Task.CompletedTask;
-            }
-
-            public Task SaveDeviceInfo(
-                int userId,
-                string deviceFingerprintHash,
-                string? secChUa,
-                string? secChUaMobile,
-                string? secChUaPlatform,
-                double? deviceMemory,
-                int? hardwareConcurrency,
-                CancellationToken cancellationToken = default)
-            {
-                LastSaveToken = cancellationToken;
-                return Task.CompletedTask;
-            }
         }
     }
 }

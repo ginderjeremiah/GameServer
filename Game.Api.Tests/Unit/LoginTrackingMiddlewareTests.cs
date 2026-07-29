@@ -213,48 +213,5 @@ namespace Game.Api.Tests.Unit
 
             return context;
         }
-
-        // Records how many times RecordConnection was actually invoked, so tests can tell whether the
-        // dedupe memo skipped the DB round-trip. ThrowOnRecordConnection lets a test pin the failure path.
-        // OnRecordConnection lets a test observe when the call happened relative to other events.
-        private sealed class FakeUserLogins : IUserLogins
-        {
-            public int RecordConnectionCallCount { get; private set; }
-            public bool ThrowOnRecordConnection { get; set; }
-            public Action? OnRecordConnection { get; set; }
-
-            public Task RecordConnection(
-                int userId,
-                string ipAddress,
-                string deviceFingerprintHash,
-                string userAgent,
-                string? secChUa,
-                string? secChUaMobile,
-                string? secChUaPlatform,
-                CancellationToken cancellationToken = default)
-            {
-                RecordConnectionCallCount++;
-                OnRecordConnection?.Invoke();
-                if (ThrowOnRecordConnection)
-                {
-                    throw new InvalidOperationException("simulated tracking failure");
-                }
-
-                return Task.CompletedTask;
-            }
-
-            public Task SaveDeviceInfo(
-                int userId,
-                string deviceFingerprintHash,
-                string? secChUa,
-                string? secChUaMobile,
-                string? secChUaPlatform,
-                double? deviceMemory,
-                int? hardwareConcurrency,
-                CancellationToken cancellationToken = default)
-            {
-                throw new NotSupportedException();
-            }
-        }
     }
 }
