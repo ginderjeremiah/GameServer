@@ -187,13 +187,14 @@ A **weapon** item additionally carries a `WeaponType` — any damage-type leaf (
 
 # Content Lifecycle — Retiring Reference Data
 
-Authored reference content (items, item mods, skills, enemies, zones, challenges) is **retired**, never hard-deleted. Retiring takes a piece of content *out of circulation* — the game stops introducing it anew — while keeping it permanently valid for anything that already references it. This is a deliberate design choice for an idle game where content ids are baked into persisted player state (equipped items, applied mods, unlocked skills, completed challenges, battle snapshots): a player who already earned a now-retired item keeps it and it behaves exactly as before, but new players won't encounter it.
+Authored reference content (items, item mods, skills, enemies, zones, challenges, proficiency paths) is **retired**, never hard-deleted. Retiring takes a piece of content *out of circulation* — the game stops introducing it anew — while keeping it permanently valid for anything that already references it. This is a deliberate design choice for an idle game where content ids are baked into persisted player state (equipped items, applied mods, unlocked skills, completed challenges, battle snapshots): a player who already earned a now-retired item keeps it and it behaves exactly as before, but new players won't encounter it.
 
 - **Retired ≠ deleted.** A retired record stays in the catalogue and is fully resolvable; it just isn't offered for new acquisition or encounters. Retiring is reversible (reinstate).
 - **What "out of circulation" means today:**
   - A retired **enemy** no longer spawns in random idle encounters.
   - A retired **challenge** can no longer be completed by a player who has not already completed it — it stops accruing progress and granting its reward — and is hidden from the challenges screen unless already completed.
   - A retired **zone** is no longer navigable — the nav UI skips it (a retired zone in the middle of the order is stepped over, not a wall) and the backend refuses a change into it or a challenge against its boss. A player whose current zone is no longer *viable* (retired, or left with no spawnable enemies) is lazily **relocated** to the nearest viable, unlocked zone on their next encounter rather than being stranded.
+  - A retired **proficiency path** stops accruing XP — the whole track freezes, but already-accrued levels and granted skills are kept (retirement only stops *further* accrual).
 
   Already-earned content is never revoked: a completed challenge keeps its reward/unlock, and an authored reference (a zone's boss, a completed gate) still resolves by id. Admin authoring pickers likewise exclude retired records from new references, while keeping an existing authored reference visible (#295).
 - **Why not delete:** deleting a non-terminal record would corrupt the id-as-index lookups the whole game relies on and orphan persisted references. See [backend.md → Retiring reference data](./backend.md#retiring-reference-data-content-lifecycle) for the mechanism and the deferred per-entity edge cases.
