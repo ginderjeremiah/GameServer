@@ -81,8 +81,8 @@ namespace Game.Api.Tests.CodeGen
             writer.WriteApiMap(endpoints, "// Auto-generated");
 
             var content = File.ReadAllText(Path.Combine(_options.TargetDirectory, "api-type-map.ts"));
-            var alphaIndex = content.IndexOf("'Alpha'");
-            var zebraIndex = content.IndexOf("'Zebra'");
+            var alphaIndex = content.IndexOf("'Alpha'", StringComparison.Ordinal);
+            var zebraIndex = content.IndexOf("'Zebra'", StringComparison.Ordinal);
             Assert.True(alphaIndex < zebraIndex);
         }
 
@@ -179,7 +179,7 @@ namespace Game.Api.Tests.CodeGen
 
             var content = File.ReadAllText(Path.Combine(_options.TargetDirectory, "api-type-map.ts"));
             Assert.StartsWith(customComment, content);
-            Assert.False(content.StartsWith(defaultComment));
+            Assert.False(content.StartsWith(defaultComment, StringComparison.Ordinal));
         }
 
         [Fact]

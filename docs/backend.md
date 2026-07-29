@@ -15,6 +15,7 @@ Four `*.Tests` projects cover the layers (`Api`/`Application`/`Core`/`Infrastruc
 
 - Repositories create and persist domain objects and dispatch domain events before persisting. They contain no domain logic and never return entity models or DB DTOs — mapping between domain objects, entities, and DTOs lives in `Game.DataAccess/Mapping`.
 - Domain logic lives in `Game.Core`. The application layer only orchestrates; the API layer only handles requests, validates input, and returns responses.
+- **String handling is ordinal and culture-invariant everywhere** — no comparison here is a linguistic one, and anything that reaches a persisted key, a cache/channel name, or the wire must render identically on every host locale. Casing and comparison are enforced by the Globalization analyzers (`.editorconfig` records which rules are on and why); number formatting in interpolated keys is convention, so build them with `string.Create(CultureInfo.InvariantCulture, $"…")`.
 
 ## Testing Guidelines
 

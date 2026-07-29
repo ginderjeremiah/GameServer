@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using System.Globalization;
 using System.Net;
 using Xunit;
 
@@ -98,7 +99,7 @@ namespace Game.Api.Tests.Integration
                         }
                         if (forwardLimit is not null)
                         {
-                            settings["ForwardedHeaders:ForwardLimit"] = forwardLimit.Value.ToString();
+                            settings["ForwardedHeaders:ForwardLimit"] = forwardLimit.Value.ToString(CultureInfo.InvariantCulture);
                         }
                         config.AddInMemoryCollection(settings);
                     });

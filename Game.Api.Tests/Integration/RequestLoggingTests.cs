@@ -35,7 +35,7 @@ namespace Game.Api.Tests.Integration
             await Client.GetAsync("/api/Auth/Status", CancellationToken);
 
             var entries = GetMiddlewareEntries(startIndex);
-            var startEntry = Assert.Single(entries, e => e.Message.StartsWith("Request Start"));
+            var startEntry = Assert.Single(entries, e => e.Message.StartsWith("Request Start", StringComparison.Ordinal));
             var scope = Assert.IsType<Dictionary<string, object?>>(startEntry.ScopeStates.Single());
             Assert.Equal("GET", scope["Method"]);
             Assert.Equal("/api/Auth/Status", scope["Path"]);
@@ -53,7 +53,7 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
 
             var entries = GetMiddlewareEntries(startIndex);
-            var endedEntry = Assert.Single(entries, e => e.Message.StartsWith("Request Ended"));
+            var endedEntry = Assert.Single(entries, e => e.Message.StartsWith("Request Ended", StringComparison.Ordinal));
             Assert.Equal(LogLevel.Information, endedEntry.Level);
 
             var statusCode = (int)endedEntry.Properties.Single(p => p.Key == "StatusCode").Value!;
@@ -76,7 +76,7 @@ namespace Game.Api.Tests.Integration
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
             var entries = GetMiddlewareEntries(startIndex);
-            var startEntry = Assert.Single(entries, e => e.Message.StartsWith("Request Start"));
+            var startEntry = Assert.Single(entries, e => e.Message.StartsWith("Request Start", StringComparison.Ordinal));
             var scope = Assert.IsType<Dictionary<string, object?>>(startEntry.ScopeStates.Single());
             Assert.Equal(userId, scope["UserId"]);
         }
@@ -92,7 +92,7 @@ namespace Game.Api.Tests.Integration
             await authClient.GetAsync("/api/Auth/Status", CancellationToken);
 
             var entries = GetMiddlewareEntries(startIndex);
-            var endedEntry = Assert.Single(entries, e => e.Message.StartsWith("Request Ended"));
+            var endedEntry = Assert.Single(entries, e => e.Message.StartsWith("Request Ended", StringComparison.Ordinal));
             var statusCode = (int)endedEntry.Properties.Single(p => p.Key == "StatusCode").Value!;
             Assert.Equal(200, statusCode);
         }

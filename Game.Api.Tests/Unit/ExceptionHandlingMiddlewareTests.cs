@@ -156,7 +156,7 @@ namespace Game.Api.Tests.Unit
             var loggingCategory = typeof(RequestLoggingMiddleware).FullName!;
             var endedEntry = Assert.Single(
                 capturingProvider.Entries.Where(e => e.Category == loggingCategory),
-                e => e.Message.StartsWith("Request Ended"));
+                e => e.Message.StartsWith("Request Ended", StringComparison.Ordinal));
             var statusCode = (int)endedEntry.Properties.Single(p => p.Key == "StatusCode").Value!;
             Assert.Equal(500, statusCode);
 

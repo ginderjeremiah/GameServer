@@ -2,6 +2,7 @@ using Game.Abstractions.Auth;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using System.Globalization;
 using System.Security.Claims;
 using System.Text;
 
@@ -45,13 +46,13 @@ namespace Game.Api.Auth
             var now = DateTime.UtcNow;
             var claims = new List<Claim>
             {
-                new(JwtRegisteredClaimNames.Sub, userId.ToString()),
+                new(JwtRegisteredClaimNames.Sub, userId.ToString(CultureInfo.InvariantCulture)),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             };
             claims.AddRange(roles.Select(role => new Claim(RoleClaimType, role)));
             if (playerId is int selectedPlayerId)
             {
-                claims.Add(new Claim(PlayerIdClaimType, selectedPlayerId.ToString()));
+                claims.Add(new Claim(PlayerIdClaimType, selectedPlayerId.ToString(CultureInfo.InvariantCulture)));
             }
 
             var descriptor = new SecurityTokenDescriptor

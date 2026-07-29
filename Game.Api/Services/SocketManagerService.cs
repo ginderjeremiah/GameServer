@@ -683,13 +683,13 @@ namespace Game.Api.Services
 
         private static string CurrentSocketKey(int playerId)
         {
-            return $"{Constants.CACHE_PLAYER_SOCKET_PREFIX}_{playerId}";
+            return string.Create(CultureInfo.InvariantCulture, $"{Constants.CACHE_PLAYER_SOCKET_PREFIX}_{playerId}");
         }
 
         /// <summary>The account-level "current live character" key <see cref="ClaimAccountPresence"/> claims.</summary>
         private static string AccountSocketKey(int userId)
         {
-            return $"{Constants.CACHE_ACCOUNT_SOCKET_PREFIX}_{userId}";
+            return string.Create(CultureInfo.InvariantCulture, $"{Constants.CACHE_ACCOUNT_SOCKET_PREFIX}_{userId}");
         }
 
         private static string PlayerIdValue(int playerId) => playerId.ToString(CultureInfo.InvariantCulture);

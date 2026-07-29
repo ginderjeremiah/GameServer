@@ -282,7 +282,7 @@ namespace Game.Api.Tests.CodeGen
             var files = Directory.GetFiles(Path.Combine(_options.TargetDirectory, "interfaces"), "*.ts");
             var content = File.ReadAllText(files[0]);
             Assert.StartsWith(customComment, content);
-            Assert.False(content.StartsWith(defaultComment));
+            Assert.False(content.StartsWith(defaultComment, StringComparison.Ordinal));
         }
 
         [Fact]

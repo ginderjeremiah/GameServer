@@ -17,7 +17,7 @@ dotnet run --project Game.Api -- codegen [outputDirectory]
 
 The output is byte-identical to the dev-time generation, so CI can run the command and assert a clean `git diff` to catch api model/client drift.
 
-**The generated output must depend only on the sources, never on the generating machine.** The drift guard compares bytes, so every casing and ordering decision in the codegen is culture-independent — culture-aware casing and collation differ by locale *and* by ICU version, so a default comparer would regenerate different bytes on another developer's machine and fail the guard spuriously.
+**The generated output must depend only on the sources, never on the generating machine.** The drift guard compares bytes, so every casing, ordering, and **number-formatting** decision in the codegen is culture-independent — culture-aware casing and collation differ by locale *and* by ICU version, and a locale's decimal separator/negative sign would emit `1,5` or a U+2212 minus straight into the TypeScript (a syntax change, not just different bytes). So a default comparer or a bare `ToString()` would regenerate differently on another developer's machine. The casing/comparison half of this is enforced at build time by the Globalization analyzers enabled in `.editorconfig` (which records per-rule what is on and why); the number-formatting half has no analyzer covering it and is pinned by locale regression tests instead.
 
 ### Generated domain constants (not just DTOs)
 
