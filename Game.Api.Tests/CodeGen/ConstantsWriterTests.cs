@@ -37,6 +37,8 @@ namespace Game.Api.Tests.CodeGen
             public const bool FlagEnabled = true;
             public const string Label = "hello";
             public const string Tricky = "a'b\\c";
+            public const int NegativeOffset = -5;
+            public const double FractionalRate = 1.5;
         }
 
         private static FieldInfo[] SampleFields =>
@@ -86,6 +88,20 @@ namespace Game.Api.Tests.CodeGen
         public void ToScreamingSnakeCase_ConvertsPascalCaseNames(string pascalCase, string expected)
         {
             Assert.Equal(expected, ConstantsWriter.ToScreamingSnakeCase(pascalCase));
+        }
+
+        [Fact]
+        public void WriteConstants_SwedishCulture_RendersNumbersInvariantly()
+        {
+            // The numeric sibling of the tr-TR casing guards below. sv-SE writes the decimal separator as
+            // "," and the negative sign as U+2212 MINUS SIGN, so a current-culture render would emit
+            // "= 1,5" (a TS syntax change) and a non-ASCII minus into the byte-compared game-constants.ts.
+            using var culture = new CultureScope("sv-SE");
+
+            var content = WriteAndRead(SampleFields);
+
+            Assert.Contains("export const FRACTIONAL_RATE = 1.5;", content, StringComparison.Ordinal);
+            Assert.Contains("export const NEGATIVE_OFFSET = -5;", content, StringComparison.Ordinal);
         }
 
         [Fact]

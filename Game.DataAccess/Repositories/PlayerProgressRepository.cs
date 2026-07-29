@@ -394,10 +394,12 @@ namespace Game.DataAccess.Repositories
         // FromHashFields never needs the caller to track kind alongside field name. The row's natural key
         // (type+entity / challenge id / proficiency id) makes each field name stable and collision-free across
         // saves, so a later HSET on the same row always overwrites the same field rather than appending a
-        // duplicate.
-        private static string StatField(int statisticTypeId, int? entityId) => $"S_{statisticTypeId}_{entityId?.ToString() ?? "n"}";
-        private static string ChallengeField(int challengeId) => $"C_{challengeId}";
-        private static string ProficiencyField(int proficiencyId) => $"P_{proficiencyId}";
+        // duplicate. The ids are formatted invariantly because the field name is a persisted key every
+        // instance in the fleet has to reproduce byte-for-byte, so it must not depend on the host locale.
+        private static string StatField(int statisticTypeId, int? entityId) =>
+            string.Create(CultureInfo.InvariantCulture, $"S_{statisticTypeId}_{entityId?.ToString(CultureInfo.InvariantCulture) ?? "n"}");
+        private static string ChallengeField(int challengeId) => string.Create(CultureInfo.InvariantCulture, $"C_{challengeId}");
+        private static string ProficiencyField(int proficiencyId) => string.Create(CultureInfo.InvariantCulture, $"P_{proficiencyId}");
 
         // Aggregate-level state rather than a row, so it gets a reserved field name outside the row-kind
         // prefixes (S_/C_/P_) — grouping with the "_" presence marker, and ignored by FromHashFields' row

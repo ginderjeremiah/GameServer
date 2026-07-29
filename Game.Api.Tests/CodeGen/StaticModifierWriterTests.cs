@@ -2,6 +2,7 @@ using Game.Api.CodeGen;
 using Game.Api.CodeGen.Writers;
 using Game.Core;
 using Game.Core.Attributes.Modifiers;
+using Game.Core.TestInfrastructure.Helpers;
 using Xunit;
 
 namespace Game.Api.Tests.CodeGen
@@ -38,6 +39,27 @@ namespace Game.Api.Tests.CodeGen
             Assert.Contains("import { EAttribute, EAttributeModifierSource, EModifierType } from './enums.ts';", content);
             Assert.Contains("export const STATIC_ATTRIBUTE_MODIFIERS = [", content);
             Assert.EndsWith("] as const;", content);
+        }
+
+        [Fact]
+        public void WriteStaticModifiers_SwedishCulture_RendersAmountInvariantly()
+        {
+            // A modifier amount is a double and may be negative, and sv-SE renders "-1.5" as "−1,5"
+            // (comma separator, U+2212 minus) — which would both break the emitted TS object literal and
+            // make the byte-compared output depend on the generating machine's locale.
+            using var culture = new CultureScope("sv-SE");
+
+            var modifier = new AttributeModifier
+            {
+                Attribute = EAttribute.MaxHealth,
+                Amount = -1.5,
+                Type = EModifierType.Additive,
+                Source = EAttributeModifierSource.BaseValue
+            };
+
+            var content = WriteAndRead([modifier]);
+
+            Assert.Contains("amount: -1.5,", content, StringComparison.Ordinal);
         }
 
         [Fact]
@@ -101,7 +123,7 @@ namespace Game.Api.Tests.CodeGen
 
             var content = WriteAndRead([first, second]);
 
-            Assert.True(content.IndexOf("EAttribute.Strength") < content.IndexOf("EAttribute.Agility"));
+            Assert.True(content.IndexOf("EAttribute.Strength", StringComparison.Ordinal) < content.IndexOf("EAttribute.Agility", StringComparison.Ordinal));
         }
 
         private string WriteAndRead(IReadOnlyList<AttributeModifier> modifiers)

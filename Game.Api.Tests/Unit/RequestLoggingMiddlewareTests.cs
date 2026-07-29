@@ -38,9 +38,9 @@ namespace Game.Api.Tests.Unit
             Assert.NotNull(category);
             var entries = capturingProvider.Entries.Where(e => e.Category == category).ToList();
 
-            Assert.Single(entries, e => e.Message.StartsWith("Request Start"));
+            Assert.Single(entries, e => e.Message.StartsWith("Request Start", StringComparison.Ordinal));
 
-            var endedEntry = Assert.Single(entries, e => e.Message.StartsWith("Request Ended"));
+            var endedEntry = Assert.Single(entries, e => e.Message.StartsWith("Request Ended", StringComparison.Ordinal));
             Assert.Equal(LogLevel.Information, endedEntry.Level);
             var statusCode = (int)Assert.IsType<int>(endedEntry.Properties.Single(p => p.Key == "StatusCode").Value);
             Assert.Equal(500, statusCode);
