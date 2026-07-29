@@ -31,6 +31,10 @@ namespace Game.Infrastructure.Database
                         connectionString = $"{connectionString};Include Error Detail=True";
                     }
 
+                    // Deliberately no EnableRetryOnFailure: a retrying execution strategy refuses
+                    // user-initiated transactions, and PlayerWriteWatermarkGuard opens one around every
+                    // guarded write-behind apply. Enabling it would throw on each of those until the guard is
+                    // wrapped in CreateExecutionStrategy().ExecuteAsync(...) (#2497).
                     optionsBuilder.UseNpgsql(connectionString)
                         .EnableSensitiveDataLogging(config.EnableSensitiveLogging);
                     break;
