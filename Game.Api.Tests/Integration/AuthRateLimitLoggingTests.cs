@@ -5,6 +5,7 @@ using Game.TestInfrastructure.Helpers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 using System.Net.Http.Json;
 using Xunit;
 
@@ -72,7 +73,7 @@ namespace Game.Api.Tests.Integration
                 {
                     config.AddInMemoryCollection(new Dictionary<string, string?>
                     {
-                        ["RateLimiting:Auth:PermitLimit"] = PermitLimit.ToString(),
+                        ["RateLimiting:Auth:PermitLimit"] = PermitLimit.ToString(CultureInfo.InvariantCulture),
                         ["RateLimiting:Auth:WindowSeconds"] = "60",
                     });
                 });

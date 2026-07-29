@@ -1,6 +1,7 @@
 using Game.DataAccess.Repositories;
 using Game.Infrastructure.Entities;
 using Xunit;
+using System.Globalization;
 
 namespace Game.Application.Tests.DataAccess
 {
@@ -58,7 +59,7 @@ namespace Game.Application.Tests.DataAccess
 
             Assert.Equal(id, ex.ActualValue);
             Assert.Contains("widget", ex.Message);
-            Assert.Contains(id.ToString(), ex.Message);
+            Assert.Contains(id.ToString(CultureInfo.InvariantCulture), ex.Message);
         }
 
         [Fact]

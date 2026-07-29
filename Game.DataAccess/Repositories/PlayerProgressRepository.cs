@@ -39,7 +39,7 @@ namespace Game.DataAccess.Repositories
         // session caches (AuthConstants.RefreshTokenLifetime) so a retune of that budget keeps them aligned.
         private static readonly TimeSpan ProgressCacheTtl = AuthConstants.RefreshTokenLifetime;
 
-        private static string ProgressKey(int playerId) => $"{Constants.CACHE_PROGRESS_PREFIX}_{playerId}";
+        private static string ProgressKey(int playerId) => string.Create(CultureInfo.InvariantCulture, $"{Constants.CACHE_PROGRESS_PREFIX}_{playerId}");
 
         // Per-scope read memo (#1820): a socket command opens one DI scope, so this repository instance is
         // shared by every read/save within that single command. Battle-lifecycle commands read the same
@@ -396,6 +396,8 @@ namespace Game.DataAccess.Repositories
         // saves, so a later HSET on the same row always overwrites the same field rather than appending a
         // duplicate. The ids are formatted invariantly because the field name is a persisted key every
         // instance in the fleet has to reproduce byte-for-byte, so it must not depend on the host locale.
+        // Both of StatField's InvariantCulture arguments are load-bearing: `??` resolves the hole to a
+        // string before string.Create sees it, so the inner one is what actually formats entityId.
         private static string StatField(int statisticTypeId, int? entityId) =>
             string.Create(CultureInfo.InvariantCulture, $"S_{statisticTypeId}_{entityId?.ToString(CultureInfo.InvariantCulture) ?? "n"}");
         private static string ChallengeField(int challengeId) => string.Create(CultureInfo.InvariantCulture, $"C_{challengeId}");

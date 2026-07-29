@@ -4,6 +4,7 @@ using Game.Core;
 using Game.DataAccess.Repositories.Caching;
 using Contracts = Game.Abstractions.Contracts;
 using Entities = Game.Infrastructure.Entities;
+using System.Globalization;
 
 namespace Game.DataAccess.Repositories.Admin
 {
@@ -254,7 +255,7 @@ namespace Game.DataAccess.Repositories.Admin
 
             var skill = _skills.LookupSkill(duplicate.Key);
             return AdminSaveResult.Failure(
-                $"Skill '{skill?.Name ?? duplicate.Key.ToString()}' would be produced by more than one active recipe; each skill may have only one producing recipe.");
+                $"Skill '{skill?.Name ?? duplicate.Key.ToString(CultureInfo.InvariantCulture)}' would be produced by more than one active recipe; each skill may have only one producing recipe.");
         }
 
         /// <summary>The live recipe graph as (result, inputs) pairs keyed by recipe id — the base every

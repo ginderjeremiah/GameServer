@@ -1,6 +1,7 @@
 using Game.Abstractions;
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess.Admin;
+using System.Globalization;
 
 namespace Game.DataAccess.Repositories.Admin
 {
@@ -42,7 +43,7 @@ namespace Game.DataAccess.Repositories.Admin
                 if (!Enum.IsDefined(value))
                 {
                     return AdminSaveResult.Failure(
-                        $"{Convert.ToInt32(value)} is not a valid {fieldName}.");
+                        $"{Convert.ToInt32(value, CultureInfo.InvariantCulture)} is not a valid {fieldName}.");
                 }
             }
 
