@@ -21,11 +21,17 @@ namespace Game.TestInfrastructure.Helpers
                 Iterations = 1000,
             }));
 
+        // The column is varchar(20) — the reason UniqueUsername truncates rather than returning a raw GUID.
+        private const int UsernameColumnLength = 20;
+
+        // Enough GUID for a suite's seeds not to collide in practice.
+        private const int MinimumGuidCharacters = 12;
+
         /// <summary>
-        /// The longest prefix <see cref="UniqueUsername"/> accepts, leaving at least 12 hex characters of GUID
-        /// inside the column's 20.
+        /// The longest prefix <see cref="UniqueUsername"/> accepts. Derived from the two constants above
+        /// rather than stated as a literal, so widening the column can't leave this silently wrong.
         /// </summary>
-        private const int MaxUsernamePrefixLength = 8;
+        private const int MaxUsernamePrefixLength = UsernameColumnLength - MinimumGuidCharacters;
 
         /// <summary>
         /// A username no other seeded user will collide with on <c>IX_Users_Username</c>, for a test that seeds
@@ -40,7 +46,7 @@ namespace Game.TestInfrastructure.Helpers
         public static string UniqueUsername(string prefix = "test")
         {
             ArgumentOutOfRangeException.ThrowIfGreaterThan(prefix.Length, MaxUsernamePrefixLength, nameof(prefix));
-            return $"{prefix}{Guid.NewGuid():N}"[..20];
+            return $"{prefix}{Guid.NewGuid():N}"[..UsernameColumnLength];
         }
 
         // Seeds a user whose credential is stored in the current self-contained PBKDF2 format.
