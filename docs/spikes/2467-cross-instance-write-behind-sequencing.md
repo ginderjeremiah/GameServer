@@ -2,6 +2,7 @@
 
 - **Spike issue:** [#2467](https://github.com/ginderjeremiah/GameServer/issues/2467)
 - **Status:** Research complete; direction decided, split into implementation sub-issues, and **being implemented from #2492 onward** — see [Implementation issues](#implementation-issues) for what has shipped. Sections describing shipped behaviour document it rather than propose it.
+- **Citations:** the **issue** number where the point is the work item, the **PR** number where the point is *when the code changed*. The implementation table below pairs them.
 - **Predecessor:** [#2460](https://github.com/ginderjeremiah/GameServer/issues/2460) closed the *within-instance* half by remembering parked player lanes across drain passes (`_parkedPlayerLanes`). That deferral has since been retired (#2475) — the guard subsumes it.
 
 ## The hazard, restated precisely
@@ -414,9 +415,10 @@ Whether a stream recovers turns on **two** questions, not one, and only `PlayerC
   who re-allocated or changed loadout inside the rejected window and never does so again waits forever.
 
 `Progress` is the clean illustration that these really are two questions: it rides ordinary play as
-reliably as `PlayerCore` does — a `ProgressUpdatedEvent` is published on every progress save, and the
-battle-completion tick saves progress alongside the player — and it still cannot recover, because the
-events it sends carry only that save's dirty rows. Answering one question is not enough.
+reliably as `PlayerCore` does — a `ProgressUpdatedEvent` is published on every progress save *that changed
+a row*, and the battle-completion tick always is one, since every battle records `EnemiesEncountered`
+before any victory/loss branching — and it still cannot recover, because the events it sends carry only
+that save's dirty rows. Answering one question is not enough.
 
 So `PlayerCore` genuinely self-heals, and **everything else is permanent until the player happens to
 rewrite that exact target** — for the two whole-state stragglers that means the next allocation or loadout
