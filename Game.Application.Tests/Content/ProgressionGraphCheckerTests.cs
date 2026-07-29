@@ -997,6 +997,40 @@ namespace Game.Application.Tests.Content
             AssertHasFinding(graph, "ZoneLevelRange", ContentGraphSeverity.Error, "Zone", 0);
         }
 
+        [Theory]
+        [InlineData(0, 10, 1)]
+        [InlineData(-1, 10, 1)]
+        [InlineData(1, 0, 1)]
+        [InlineData(1, 10, 0)]
+        public void Zone_LevelBelowTheMinimum_IsError(int levelMin, int levelMax, int bossLevel)
+        {
+            // The seeder loads the committed export straight into the database without passing through
+            // AdminZones.SaveZones, so this lint is the only guard on that authoring door — and the domain
+            // model throws on any of these, crashing the zone cache's build (and boot) once seeded (#2518).
+            var graph = HealthyGraph() with
+            {
+                Zones =
+                [
+                    Zone(0, bossEnemyId: 1, levelMin: levelMin, levelMax: levelMax, bossLevel: bossLevel),
+                    Zone(1, unlockChallengeId: 0),
+                    Zone(2, isHome: true),
+                ],
+            };
+            AssertHasFinding(graph, "ZoneLevelBound", ContentGraphSeverity.Error, "Zone", 0);
+        }
+
+        [Fact]
+        public void Zone_BossLevelBelowTheMinimum_IsErrorEvenWithNoBossAuthored()
+        {
+            // BossLevel is a non-nullable column the domain model validates unconditionally, so an unbossed
+            // zone carrying 0 poisons the snapshot exactly the same way.
+            var graph = HealthyGraph() with
+            {
+                Zones = [Zone(0, bossEnemyId: 1), Zone(1, unlockChallengeId: 0, bossLevel: 0), Zone(2, isHome: true)],
+            };
+            AssertHasFinding(graph, "ZoneLevelBound", ContentGraphSeverity.Error, "Zone", 1);
+        }
+
         [Fact]
         public void RetiredSourceRecords_AreNotCheckedAsSources()
         {

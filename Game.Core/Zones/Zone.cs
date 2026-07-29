@@ -22,10 +22,10 @@ namespace Game.Core.Zones
             get => _levelMin;
             init
             {
-                if (value < 1)
+                if (!ZoneLevelRules.IsValidLevel(value))
                 {
                     throw new ArgumentOutOfRangeException(nameof(LevelMin), value,
-                        $"{nameof(LevelMin)} must be at least 1.");
+                        $"{nameof(LevelMin)} must be at least {ZoneLevelRules.MinZoneLevel}.");
                 }
 
                 _levelMin = value;
@@ -40,10 +40,10 @@ namespace Game.Core.Zones
             get => _levelMax;
             init
             {
-                if (value < 1)
+                if (!ZoneLevelRules.IsValidLevel(value))
                 {
                     throw new ArgumentOutOfRangeException(nameof(LevelMax), value,
-                        $"{nameof(LevelMax)} must be at least 1.");
+                        $"{nameof(LevelMax)} must be at least {ZoneLevelRules.MinZoneLevel}.");
                 }
 
                 _levelMax = value;
@@ -63,10 +63,10 @@ namespace Game.Core.Zones
             get => _bossLevel;
             init
             {
-                if (value < 1)
+                if (!ZoneLevelRules.IsValidLevel(value))
                 {
                     throw new ArgumentOutOfRangeException(nameof(BossLevel), value,
-                        $"{nameof(BossLevel)} must be at least 1.");
+                        $"{nameof(BossLevel)} must be at least {ZoneLevelRules.MinZoneLevel}.");
                 }
 
                 _bossLevel = value;
@@ -103,12 +103,16 @@ namespace Game.Core.Zones
         /// bounds' <c>init</c> accessors so a mis-authored range is rejected at construction (with the
         /// offending values named) rather than throwing mid-battle in <see cref="RollEncounterLevel"/>.
         /// The check runs only once both bounds are assigned: a not-yet-set bound has its backing field at
-        /// the default <c>0</c>, which a valid level (always &gt;= 1) never is, so the first accessor is a
-        /// no-op and the second performs the comparison regardless of initializer order.
+        /// the default <c>0</c>, which a valid level (at least <see cref="ZoneLevelRules.MinZoneLevel"/>)
+        /// never is, so the first accessor is a no-op and the second performs the comparison regardless of
+        /// initializer order. The assigned-ness test goes through <see cref="ZoneLevelRules.IsValidLevel"/>
+        /// rather than a bare <c>&gt; 0</c> so it stays tied to that bound instead of silently assuming it.
         /// </summary>
         private void ValidateLevelRange()
         {
-            if (_levelMin > 0 && _levelMax > 0 && _levelMin > _levelMax)
+            if (ZoneLevelRules.IsValidLevel(_levelMin)
+                && ZoneLevelRules.IsValidLevel(_levelMax)
+                && !ZoneLevelRules.IsOrderedRange(_levelMin, _levelMax))
             {
                 throw new ArgumentException(
                     $"{nameof(LevelMin)} ({_levelMin}) cannot be greater than {nameof(LevelMax)} ({_levelMax}).",

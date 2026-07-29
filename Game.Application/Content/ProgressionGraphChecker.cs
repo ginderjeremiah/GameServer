@@ -6,6 +6,7 @@ using Game.Core.Battle;
 using Game.Core.Proficiencies;
 using Game.Core.Progress;
 using Game.Core.Skills;
+using Game.Core.Zones;
 using Contracts = Game.Abstractions.Contracts;
 using GameAttribute = Game.Core.Attributes.Attribute;
 
@@ -105,10 +106,23 @@ namespace Game.Application.Content
             {
                 foreach (var zone in Live(_graph.Zones, z => z.RetiredAt))
                 {
-                    // The domain Zone model (Game.Core.Zones.Zone) throws at construction if LevelMin > LevelMax,
-                    // so a mis-authored range doesn't just misbehave in-game — it crashes the zone's own cache
-                    // load. Catching it here, over the committed export, is cheaper than a startup crash.
-                    if (zone.LevelMin > zone.LevelMax)
+                    // The domain Zone model (Game.Core.Zones.Zone) throws at construction on any of these, so a
+                    // mis-authored level doesn't just misbehave in-game — it crashes the zone's own cache load.
+                    // Catching it here, over the committed export, is cheaper than a startup crash: the seeder
+                    // loads that export straight into the database (Startup → IContentSeeder), never passing
+                    // through AdminZones.SaveZones' matching authoring guard, so this is the only thing standing
+                    // between a hand-edited content/zones.json and an unbootable instance (#2518).
+                    // Shares ZoneLevelRules with the domain model and the admin save so all three agree.
+                    foreach (var (label, level) in ZoneLevels(zone))
+                    {
+                        if (!ZoneLevelRules.IsValidLevel(level))
+                        {
+                            Error("ZoneLevelBound", "Zone", zone.Id,
+                                $"has {label} {level}, below the minimum authorable level of {ZoneLevelRules.MinZoneLevel}.");
+                        }
+                    }
+
+                    if (!ZoneLevelRules.IsOrderedRange(zone.LevelMin, zone.LevelMax))
                     {
                         Error("ZoneLevelRange", "Zone", zone.Id, $"has LevelMin {zone.LevelMin} greater than LevelMax {zone.LevelMax}.");
                     }
@@ -129,6 +143,17 @@ namespace Game.Application.Content
                         CheckRef("ZoneUnlock", "Zone", zone.Id, _challengeRetire, "challenge", challengeId, ContentGraphSeverity.Error, ContentGraphSeverity.Error);
                     }
                 }
+            }
+
+            /// <summary>
+            /// A zone's three authored level fields paired with their display labels. The boss level is
+            /// included whether or not a boss is authored, since the domain model requires it regardless.
+            /// </summary>
+            private static IEnumerable<(string Label, int Level)> ZoneLevels(Contracts.Zone zone)
+            {
+                yield return ("LevelMin", zone.LevelMin);
+                yield return ("LevelMax", zone.LevelMax);
+                yield return ("BossLevel", zone.BossLevel);
             }
 
             // --- Challenges -------------------------------------------------------------------------------

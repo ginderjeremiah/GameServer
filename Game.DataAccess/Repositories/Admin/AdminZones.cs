@@ -2,6 +2,7 @@ using Game.Abstractions;
 using Game.Abstractions.Contracts.Admin;
 using Game.Abstractions.DataAccess;
 using Game.Abstractions.DataAccess.Admin;
+using Game.Core.Zones;
 using Contracts = Game.Abstractions.Contracts;
 using Entities = Game.Infrastructure.Entities;
 
@@ -34,6 +35,15 @@ namespace Game.DataAccess.Repositories.Admin
                 if (change.ChangeType == EChangeType.Delete)
                 {
                     continue;
+                }
+
+                // Anti-tamper: the level fields are unchecked all the way to the column, but the Zone domain
+                // model throws on them when the snapshot rebuilds — so a committed out-of-range level poisons
+                // every subsequent reload (and, since caches populate eagerly, every boot) with the bad row
+                // already durable. Reject it up front, like SetEnemies' negative-weight guard.
+                if (LevelRangeFailure(change.Item) is string levelFailure)
+                {
+                    return AdminSaveResult.Failure(levelFailure);
                 }
 
                 if (change.Item.BossEnemyId is int bossEnemyId
@@ -93,6 +103,37 @@ namespace Game.DataAccess.Repositories.Admin
                 // An edit must target an existing zone; a missing id is a not-found rejection (matching the
                 // relationship setters), validated up front by the processor before anything is staged.
                 editExists: item => _zones.LookupZone(item.Id) is not null);
+        }
+
+        /// <summary>
+        /// The user-facing rejection message for the first broken encounter-level rule on <paramref name="item"/>,
+        /// or <c>null</c> when the authored levels satisfy every rule <see cref="Game.Core.Zones.Zone"/> enforces
+        /// at construction. The boss level is checked whether or not a boss is authored, since the domain model
+        /// requires it regardless.
+        /// </summary>
+        private static string? LevelRangeFailure(Contracts.Zone item)
+        {
+            if (!ZoneLevelRules.IsValidLevel(item.LevelMin))
+            {
+                return $"Level Min must be at least {ZoneLevelRules.MinZoneLevel}.";
+            }
+
+            if (!ZoneLevelRules.IsValidLevel(item.LevelMax))
+            {
+                return $"Level Max must be at least {ZoneLevelRules.MinZoneLevel}.";
+            }
+
+            if (!ZoneLevelRules.IsOrderedRange(item.LevelMin, item.LevelMax))
+            {
+                return "Level Min cannot be greater than Level Max.";
+            }
+
+            if (!ZoneLevelRules.IsValidLevel(item.BossLevel))
+            {
+                return $"Boss Level must be at least {ZoneLevelRules.MinZoneLevel}.";
+            }
+
+            return null;
         }
 
         private static Entities.Zone ToEntity(Contracts.Zone item)
